@@ -75,6 +75,16 @@ function loadEnv() {
     /\/+$/,
     '',
   );
+  const swaggerUsername = process.env.SWAGGER_USERNAME || '';
+  const swaggerPassword = process.env.SWAGGER_PASSWORD || '';
+
+  if (isProduction && bool(process.env.ENABLE_SWAGGER, !isProduction)) {
+    if (!swaggerUsername || !swaggerPassword) {
+      throw new Error(
+        "ENABLE_SWAGGER=true bo'lganda productionda SWAGGER_USERNAME va SWAGGER_PASSWORD majburiy.",
+      );
+    }
+  }
 
   return {
     nodeEnv,
@@ -88,6 +98,8 @@ function loadEnv() {
     apiPrefix: '/api/v1',
     apiPublicUrl,
     enableSwagger: bool(process.env.ENABLE_SWAGGER, !isProduction),
+    swaggerUsername,
+    swaggerPassword,
     trustProxy: bool(process.env.TRUST_PROXY, isProduction),
     rateLimitWindowMinutes: int(process.env.RATE_LIMIT_WINDOW_MINUTES, 15),
     rateLimitMax: int(process.env.RATE_LIMIT_MAX, 300),

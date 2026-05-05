@@ -17,6 +17,27 @@ info:
     avtomatik bekor qilinadi (rotation). Bekor qilingan refresh qaytadan ishlatilsa,
     foydalanuvchining barcha sessiyalari bekor qilinadi.
 
+    ## So'rovni qanday yuborish (juda sodda)
+    1. Kerakli endpointni tanlang (`GET`, `POST`, `PATCH`, `DELETE`).
+    2. Agar `POST/PATCH` bo'lsa, pastdagi `Request body`ga JSON yozing.
+    3. Agar qulf belgisi bo'lsa, avval login qiling va `Authorize`ga token kiriting.
+    4. `Try it out` -> `Execute` bosing.
+    5. Javobda `success: true` bo'lsa, hammasi yaxshi.
+
+    ## cURL bilan tez sinash
+    Quyidagi misollarda `BASE_URL` o'rniga o'z server manzilingizni qo'ying:
+    - Production: `https://vetclinicbackend.up.railway.app/api/v1`
+    - Lokal: `http://localhost:4000/api/v1`
+
+    ## Postman'da 1 daqiqada test qilish
+    1. Postman oching -> `New` -> `HTTP Request`.
+    2. URL yozing: `https://vetclinicbackend.up.railway.app/api/v1/health`.
+    3. Method: `GET` -> `Send` bosing (health ishlasa API tirik).
+    4. Login uchun `POST /auth/login` yuboring (`Body -> raw -> JSON`).
+    5. Javobdan `accessToken`ni oling.
+    6. Himoyalangan endpointlarda `Authorization -> Bearer Token`ga shu tokenni qo'ying.
+    7. Masalan `GET /admin/dashboard` yuborib tekshiring (admin token bo'lsa ishlaydi).
+
   contact:
     name: API Support
   license:
@@ -43,6 +64,16 @@ paths:
     get:
       tags: [Health]
       summary: Servis holati
+      description: |
+        Bu endpoint server tirikligini tekshiradi.
+        Hech qanday login yoki body kerak emas.
+        Faqat `GET /health` yuborasiz.
+        Javobda: `status`, `version`, `uptimeSec`, `docs` qaytadi.
+        
+        cURL:
+        ```bash
+        curl -X GET "$BASE_URL/health"
+        ```
       operationId: healthCheck
       responses:
         '200':
@@ -56,6 +87,18 @@ paths:
     post:
       tags: [Auth]
       summary: Ro‘yxatdan o‘tish
+      description: |
+        Yangi foydalanuvchi ochadi.
+        `email` va `password` yuborish majburiy.
+        So'rov: `POST /auth/register` + JSON body.
+        Javobda: `user`, `accessToken`, `refreshToken` qaytadi.
+        
+        cURL:
+        ```bash
+        curl -X POST "$BASE_URL/auth/register" \
+          -H "Content-Type: application/json" \
+          -d '{"email":"ali@example.com","password":"StrongP@ss1","name":"Ali"}'
+        ```
       operationId: authRegister
       requestBody:
         required: true
@@ -78,6 +121,18 @@ paths:
     post:
       tags: [Auth]
       summary: Tizimga kirish
+      description: |
+        Mavjud account bilan tizimga kiradi.
+        To'g'ri bo'lsa `accessToken` va `refreshToken` qaytadi.
+        So'rov: `POST /auth/login` + JSON body.
+        Javobda: `user`, `accessToken`, `refreshToken` qaytadi.
+        
+        cURL:
+        ```bash
+        curl -X POST "$BASE_URL/auth/login" \
+          -H "Content-Type: application/json" \
+          -d '{"email":"ali@example.com","password":"StrongP@ss1"}'
+        ```
       operationId: authLogin
       requestBody:
         required: true
@@ -100,6 +155,18 @@ paths:
     post:
       tags: [Auth]
       summary: Access tokenni yangilash (rotation + reuse-detection)
+      description: |
+        Access token tugaganda yangi token olish uchun ishlatiladi.
+        Body ichida `refreshToken` yuborasiz.
+        So'rov: `POST /auth/refresh` + JSON body.
+        Javobda: yangi `accessToken` va yangi `refreshToken` qaytadi.
+        
+        cURL:
+        ```bash
+        curl -X POST "$BASE_URL/auth/refresh" \
+          -H "Content-Type: application/json" \
+          -d '{"refreshToken":"YOUR_REFRESH_TOKEN"}'
+        ```
       operationId: authRefresh
       requestBody:
         required: true
@@ -122,6 +189,18 @@ paths:
     post:
       tags: [Auth]
       summary: Refresh sessiyasini bekor qilish
+      description: |
+        Chiqish (logout) qiladi va refresh tokenni bekor qiladi.
+        Body ixtiyoriy, lekin `refreshToken` yuborish tavsiya etiladi.
+        So'rov: `POST /auth/logout`.
+        Javobda: `{ success: true, data: { ok: true } }`.
+        
+        cURL:
+        ```bash
+        curl -X POST "$BASE_URL/auth/logout" \
+          -H "Content-Type: application/json" \
+          -d '{"refreshToken":"YOUR_REFRESH_TOKEN"}'
+        ```
       operationId: authLogout
       requestBody:
         required: false
@@ -145,6 +224,12 @@ paths:
       description: |
         Foydalanuvchi joylashuvi (`lat`, `lng`) atrofidagi klinikalarni
         masofaga ko‘ra tartiblangan ro‘yxat ko‘rinishida qaytaradi.
+        Javobda: `clinics[]` ichida `name`, `distanceKm`, `isOpenNow`, `todayHours`, `averageRating` qaytadi.
+        
+        cURL:
+        ```bash
+        curl -X GET "$BASE_URL/clinics/nearby?lat=41.31&lng=69.25&radiusKm=5"
+        ```
       operationId: clinicsNearby
       parameters:
         - in: query
@@ -192,6 +277,16 @@ paths:
     get:
       tags: [Clinics]
       summary: Klinika tafsilotlari
+      description: |
+        Bitta klinikaning to'liq ma'lumotini qaytaradi (manzil, telefon, sharhlar).
+        URLdagi `{id}` o'rniga klinika ID yoziladi.
+        So'rov: `GET /clinics/{id}`.
+        Javobda: klinika ma'lumoti + `reviews[]` qaytadi.
+        
+        cURL:
+        ```bash
+        curl -X GET "$BASE_URL/clinics/CLINIC_ID"
+        ```
       operationId: clinicById
       parameters:
         - in: path
@@ -212,6 +307,17 @@ paths:
     get:
       tags: [Admin]
       summary: Boshqaruv statistikasi
+      description: |
+        Faqat ADMIN uchun umumiy statistika (`users`, `clinics`, `reviews`) beradi.
+        Login qiling, `Authorize`ga admin access token kiriting.
+        So'rov: `GET /admin/dashboard`.
+        Javobda: `counts` va `latestReviews[]` qaytadi.
+        
+        cURL:
+        ```bash
+        curl -X GET "$BASE_URL/admin/dashboard" \
+          -H "Authorization: Bearer YOUR_ADMIN_ACCESS_TOKEN"
+        ```
       operationId: adminDashboard
       security: [{ bearerAuth: [] }]
       responses:
@@ -227,6 +333,17 @@ paths:
     get:
       tags: [Admin]
       summary: Klinikalar ro‘yxati (sahifalashtirilgan)
+      description: |
+        Faqat ADMIN uchun klinikalar ro'yxatini sahifalab beradi.
+        Query paramlar: `page`, `pageSize`, `q`.
+        So'rov: `GET /admin/clinics?page=1&pageSize=20`.
+        Javobda: `items[]`, `page`, `pageSize`, `total` qaytadi.
+        
+        cURL:
+        ```bash
+        curl -X GET "$BASE_URL/admin/clinics?page=1&pageSize=20" \
+          -H "Authorization: Bearer YOUR_ADMIN_ACCESS_TOKEN"
+        ```
       operationId: adminListClinics
       security: [{ bearerAuth: [] }]
       parameters:
@@ -244,6 +361,19 @@ paths:
     post:
       tags: [Admin]
       summary: Yangi klinika yaratish
+      description: |
+        Faqat ADMIN yangi klinika qo'shadi.
+        Kerakli maydonlar: name, phone, address, city, latitude, longitude, openingHours.
+        So'rov: `POST /admin/clinics` + JSON body.
+        Javobda: yaratilgan klinika obyekti qaytadi.
+        
+        cURL:
+        ```bash
+        curl -X POST "$BASE_URL/admin/clinics" \
+          -H "Authorization: Bearer YOUR_ADMIN_ACCESS_TOKEN" \
+          -H "Content-Type: application/json" \
+          -d '{"name":"Vet Service","phone":"+998901234567","address":"Chilonzor","city":"Toshkent","latitude":41.285,"longitude":69.204,"openingHours":{"mon":{"open":"09:00","close":"19:00"}}}'
+        ```
       operationId: adminCreateClinic
       security: [{ bearerAuth: [] }]
       requestBody:
@@ -265,6 +395,10 @@ paths:
     get:
       tags: [Admin]
       summary: Klinika ma’lumoti (admin ko‘rinish)
+      description: |
+        Faqat ADMIN uchun bitta klinikani ID bo'yicha oladi.
+        So'rov: `GET /admin/clinics/{id}`.
+        Javobda: tanlangan klinika obyekti qaytadi.
       operationId: adminGetClinic
       security: [{ bearerAuth: [] }]
       parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
@@ -278,6 +412,19 @@ paths:
     patch:
       tags: [Admin]
       summary: Klinikani yangilash
+      description: |
+        Faqat ADMIN klinika maydonlarini yangilaydi.
+        O'zgartirmoqchi bo'lgan maydonlarni bodyga yuboring.
+        So'rov: `PATCH /admin/clinics/{id}` + JSON body.
+        Javobda: yangilangan klinika obyekti qaytadi.
+        
+        cURL:
+        ```bash
+        curl -X PATCH "$BASE_URL/admin/clinics/CLINIC_ID" \
+          -H "Authorization: Bearer YOUR_ADMIN_ACCESS_TOKEN" \
+          -H "Content-Type: application/json" \
+          -d '{"phone":"+998901112233"}'
+        ```
       operationId: adminUpdateClinic
       security: [{ bearerAuth: [] }]
       parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
@@ -297,6 +444,16 @@ paths:
     delete:
       tags: [Admin]
       summary: Klinikani o‘chirish
+      description: |
+        Faqat ADMIN klinikani o'chiradi.
+        So'rov: `DELETE /admin/clinics/{id}`.
+        Javobda: `{ ok: true }`.
+        
+        cURL:
+        ```bash
+        curl -X DELETE "$BASE_URL/admin/clinics/CLINIC_ID" \
+          -H "Authorization: Bearer YOUR_ADMIN_ACCESS_TOKEN"
+        ```
       operationId: adminDeleteClinic
       security: [{ bearerAuth: [] }]
       parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
@@ -312,6 +469,17 @@ paths:
     get:
       tags: [Admin]
       summary: Sharhlar ro‘yxati
+      description: |
+        Faqat ADMIN sharhlar ro'yxatini oladi.
+        Query paramlar: `page`, `pageSize`, `q`.
+        So'rov: `GET /admin/reviews`.
+        Javobda: `items[]`, `page`, `pageSize`, `total` qaytadi.
+        
+        cURL:
+        ```bash
+        curl -X GET "$BASE_URL/admin/reviews?page=1&pageSize=20" \
+          -H "Authorization: Bearer YOUR_ADMIN_ACCESS_TOKEN"
+        ```
       operationId: adminListReviews
       security: [{ bearerAuth: [] }]
       parameters:
@@ -329,6 +497,16 @@ paths:
     delete:
       tags: [Admin]
       summary: Sharhni o‘chirish
+      description: |
+        Faqat ADMIN bitta sharhni o'chiradi.
+        So'rov: `DELETE /admin/reviews/{id}`.
+        Javobda: `{ ok: true }`.
+        
+        cURL:
+        ```bash
+        curl -X DELETE "$BASE_URL/admin/reviews/REVIEW_ID" \
+          -H "Authorization: Bearer YOUR_ADMIN_ACCESS_TOKEN"
+        ```
       operationId: adminDeleteReview
       security: [{ bearerAuth: [] }]
       parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
@@ -344,6 +522,17 @@ paths:
     get:
       tags: [Admin]
       summary: Foydalanuvchilar ro‘yxati
+      description: |
+        Faqat ADMIN foydalanuvchilar ro'yxatini oladi.
+        Query paramlar: `page`, `pageSize`, `q`.
+        So'rov: `GET /admin/users`.
+        Javobda: `items[]`, `page`, `pageSize`, `total` qaytadi.
+        
+        cURL:
+        ```bash
+        curl -X GET "$BASE_URL/admin/users?page=1&pageSize=20" \
+          -H "Authorization: Bearer YOUR_ADMIN_ACCESS_TOKEN"
+        ```
       operationId: adminListUsers
       security: [{ bearerAuth: [] }]
       parameters:
@@ -361,6 +550,18 @@ paths:
     patch:
       tags: [Admin]
       summary: Foydalanuvchi rolini o‘zgartirish
+      description: |
+        Faqat ADMIN foydalanuvchi rolini `USER` yoki `ADMIN`ga o'zgartiradi.
+        So'rov: `PATCH /admin/users/{id}/role` + `{ "role": "ADMIN" }`.
+        Javobda: yangilangan user obyekti qaytadi.
+        
+        cURL:
+        ```bash
+        curl -X PATCH "$BASE_URL/admin/users/USER_ID/role" \
+          -H "Authorization: Bearer YOUR_ADMIN_ACCESS_TOKEN" \
+          -H "Content-Type: application/json" \
+          -d '{"role":"ADMIN"}'
+        ```
       operationId: adminUpdateUserRole
       security: [{ bearerAuth: [] }]
       parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
@@ -386,6 +587,16 @@ paths:
     delete:
       tags: [Admin]
       summary: Foydalanuvchini o‘chirish
+      description: |
+        Faqat ADMIN foydalanuvchini tizimdan o'chiradi.
+        So'rov: `DELETE /admin/users/{id}`.
+        Javobda: `{ ok: true }`.
+        
+        cURL:
+        ```bash
+        curl -X DELETE "$BASE_URL/admin/users/USER_ID" \
+          -H "Authorization: Bearer YOUR_ADMIN_ACCESS_TOKEN"
+        ```
       operationId: adminDeleteUser
       security: [{ bearerAuth: [] }]
       parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
@@ -405,6 +616,17 @@ paths:
       description: |
         Har bir foydalanuvchi bitta klinikaga **bitta** sharh qoldira oladi.
         Qaytadan yuborilsa, oldingi sharh `rating` va `comment` qiymatlariga yangilanadi.
+        Login qilgan foydalanuvchi bo'lishi shart (`Bearer` token kerak).
+        So'rov: `POST /clinics/{id}/reviews` + JSON body.
+        Javobda: saqlangan sharh (`id`, `rating`, `comment`, `createdAt`) qaytadi.
+        
+        cURL:
+        ```bash
+        curl -X POST "$BASE_URL/clinics/CLINIC_ID/reviews" \
+          -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+          -H "Content-Type: application/json" \
+          -d '{"rating":5,"comment":"Juda yaxshi xizmat"}'
+        ```
       operationId: clinicCreateReview
       security:
         - bearerAuth: []
