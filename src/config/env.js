@@ -68,7 +68,13 @@ function loadEnv() {
   }
 
   const port = int(process.env.PORT, 4000);
-  const apiPublicUrl = (process.env.API_PUBLIC_URL || `http://localhost:${port}`).replace(/\/+$/, '');
+  const railwayUrl =
+    process.env.RAILWAY_STATIC_URL ||
+    (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : '');
+  const apiPublicUrl = (process.env.API_PUBLIC_URL || railwayUrl || `http://localhost:${port}`).replace(
+    /\/+$/,
+    '',
+  );
 
   return {
     nodeEnv,
