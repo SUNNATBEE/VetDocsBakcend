@@ -20,6 +20,5 @@ build
 prisma/dev.db
 prisma/*.sqlite*
 README.md
-docs
 .railway
 .vercel

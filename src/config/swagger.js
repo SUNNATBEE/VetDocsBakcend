@@ -16,7 +16,14 @@ function setupSwagger(app, env) {
   if (!env.enableSwagger) {
     return;
   }
-  const document = loadOpenApiDocument(env);
+  let document;
+  try {
+    document = loadOpenApiDocument(env);
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('[swagger] OpenAPI hujjatini yuklab bo\'lmadi:', err.message);
+    return;
+  }
   app.use(
     '/docs',
     swaggerUi.serve,
