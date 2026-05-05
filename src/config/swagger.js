@@ -7,8 +7,7 @@ function loadOpenApiDocument(env) {
   const specPath = path.join(__dirname, '../../docs/openapi.yaml');
   const raw = fs.readFileSync(specPath, 'utf8');
   const doc = yaml.parse(raw);
-  const base = `${env.apiPublicUrl}${env.apiPrefix}`;
-  doc.servers = [{ url: base, description: 'API v1' }];
+  doc.servers = [{ url: `${env.apiPublicUrl}${env.apiPrefix}`, description: 'API v1' }];
   return doc;
 }
 
