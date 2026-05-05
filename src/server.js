@@ -1,18 +1,10 @@
 const { createApp } = require('./app');
 const { connectPrisma, disconnectPrisma } = require('./infrastructure/database/prisma.client');
 
+const DB_RECONNECT_DELAY_MS = 5000;
+
 async function bootstrap() {
   const { app, env } = createApp();
-
-  try {
-    await connectPrisma();
-    // eslint-disable-next-line no-console
-    console.log('[db] Postgres ulanish OK');
-  } catch (err) {
-    // eslint-disable-next-line no-console
-    console.error('[db] Postgres ulanish xatosi:', err.message);
-    process.exit(1);
-  }
 
   const server = app.listen(env.port, () => {
     // eslint-disable-next-line no-console
@@ -23,9 +15,34 @@ async function bootstrap() {
     }
   });
 
+  // Railway healthcheck port ochilganini kutadi; DB vaqtincha yo'q bo'lsa ham
+  // servisni yiqitmaymiz va fonda qayta ulanishni davom ettiramiz.
+  let reconnectTimer = null;
+  let shuttingDown = false;
+
+  async function connectDatabaseWithRetry() {
+    try {
+      await connectPrisma();
+      // eslint-disable-next-line no-console
+      console.log('[db] Postgres ulanish OK');
+      reconnectTimer = null;
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('[db] Postgres ulanish xatosi:', err.message);
+      if (!shuttingDown) {
+        reconnectTimer = setTimeout(connectDatabaseWithRetry, DB_RECONNECT_DELAY_MS);
+        reconnectTimer.unref();
+      }
+    }
+  }
+
+  void connectDatabaseWithRetry();
+
   async function shutdown(signal) {
     // eslint-disable-next-line no-console
     console.log(`\n[api] ${signal} qabul qilindi, server yopilmoqda...`);
+    shuttingDown = true;
+    if (reconnectTimer) clearTimeout(reconnectTimer);
     server.close(async () => {
       await disconnectPrisma();
       process.exit(0);
