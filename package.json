@@ -43,13 +43,13 @@
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
+    "prisma": "^6.8.2",
     "swagger-ui-express": "^5.0.1",
     "yaml": "^2.7.0",
     "zod": "^3.24.4"
   },
   "devDependencies": {
-    "nodemon": "^3.1.10",
-    "prisma": "^6.8.2"
+    "nodemon": "^3.1.10"
   },
   "prisma": {
     "seed": "node prisma/seed.js"
