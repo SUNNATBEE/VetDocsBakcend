@@ -34,30 +34,31 @@ function errorHandler(err, req, res, next) {
     return next(err);
   }
 
+  const isProd = process.env.NODE_ENV === 'production';
   const mapped = mapKnownError(err) || {};
   const status = err.status || err.statusCode || mapped.status || 500;
   const code = err.code || mapped.code || STATUS_TO_CODE[status] || 'INTERNAL_ERROR';
-  const message = err.expose || err.status ? err.message : err.message || mapped.message || 'Server xatosi';
+  const exposeMessage = Boolean(err.expose || err.status || err.statusCode);
+  const fallbackMessage = mapped.message || 'Server xatosi';
+  const message = exposeMessage ? err.message || fallbackMessage : fallbackMessage;
   const details = err.details;
 
-  if (process.env.NODE_ENV !== 'production' && status >= 500 && err.stack) {
+  if (status >= 500) {
     // eslint-disable-next-line no-console
-    console.error(`[${req.requestId || '-'}]`, err.stack);
+    console.error(`[${req.requestId || '-'}] ${req.method} ${req.originalUrl}`, err.stack || err);
   }
 
   const body = {
     success: false,
     error: {
       code,
-      message: status >= 500 && process.env.NODE_ENV === 'production'
-        ? 'Server xatosi'
-        : message,
+      message: status >= 500 && isProd ? 'Server xatosi' : message,
       ...(details ? { details } : {}),
     },
     meta: { requestId: req.requestId || null },
   };
 
-  if (process.env.NODE_ENV !== 'production' && status >= 500 && err.stack) {
+  if (!isProd && status >= 500 && err.stack) {
     body.error.stack = err.stack;
   }
 

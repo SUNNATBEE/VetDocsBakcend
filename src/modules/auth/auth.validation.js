@@ -28,8 +28,6 @@ const logoutSchema = z
   .object({
     refreshToken: z.string().min(20).optional(),
   })
-  .partial()
-  .optional()
   .default({});
 
 module.exports = {

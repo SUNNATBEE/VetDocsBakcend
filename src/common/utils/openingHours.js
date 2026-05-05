@@ -35,6 +35,9 @@ function isOpenNow(openingHoursJson) {
   }
 
   const { dayKey, minutes } = getNowInTimezone();
+  if (!hours || typeof hours !== 'object') {
+    return { open: false, dayKey, reason: 'invalid_hours' };
+  }
   const day = hours[dayKey];
   if (!day || day.open == null || day.close == null) {
     return { open: false, dayKey, reason: 'closed_today' };
