@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "playwright-cli": {
+      "source": "VoltAgent/voltagent",
+      "sourceType": "github",
+      "skillPath": "examples/with-workspace/workspace/skills/playwright-cli/SKILL.md",
+      "computedHash": "846159658d0d5261f449e495e22f31950a98cbcd03436a136c88bcb797e7b1bf"
+    }
+  }
+}

@@ -1,0 +1,101 @@
+# =============================================================================
+# .claudeignore — token-budget filter for Claude Code
+# =============================================================================
+# Files matched here are excluded from glob/grep result sets and from default
+# directory listings. Claude can still open any of them with an explicit Read,
+# so this is purely an attention/cost filter — not a security boundary.
+#
+# Rule of thumb: ignore anything that is generated, vendored, immutable history,
+# or a multi-thousand-line spec that is rarely the answer to a code question.
+# =============================================================================
+
+
+# ───────── Already covered by .gitignore (kept here for explicitness) ────────
+node_modules/
+.env
+.env.*
+!.env.example
+*.log
+logs/
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+prisma/dev.db
+prisma/*.db
+dist/
+build/
+coverage/
+.cache/
+.tmp/
+.nyc_output/
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+.vercel
+.railway
+.netlify
+
+# Playwright artifacts
+test-results/
+playwright-report/
+playwright/.cache/
+tests/e2e/.snapshots/
+
+
+# ───────── Lockfiles — huge, auto-generated, never useful for reasoning ──────
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+
+# ───────── Prisma generated client + applied migration SQL ───────────────────
+# Migration SQL is immutable history — read-only when debugging schema state.
+# When Claude actually needs it, it can ask for the specific migration by path.
+prisma/migrations/**/*.sql
+prisma/migrations/**/migration.sql
+node_modules/.prisma/
+node_modules/@prisma/client/
+
+
+# ───────── OpenAPI spec — 1100+ lines, source of /docs ───────────────────────
+# Update via the Swagger UI or hand-edits; Claude rarely needs the full doc
+# in context to reason about an endpoint (the per-module CLAUDE.md captures it).
+docs/openapi.yaml
+
+
+# ───────── Long-form ops docs — useful but not in every conversation ─────────
+DEPLOYMENT.md
+PRODUCTION-CHANGES.md
+
+
+# ───────── Compiled / minified web assets (none today, future-proof) ────────
+public/**/*.min.js
+public/**/*.min.css
+public/**/*.map
+
+
+# ───────── Binaries / images / archives ──────────────────────────────────────
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
+*.ico
+*.pdf
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.7z
+*.rar
+
+
+# ───────── OS / editor crud ──────────────────────────────────────────────────
+desktop.ini
+ehthumbs.db
+*.bak
+*.tmp

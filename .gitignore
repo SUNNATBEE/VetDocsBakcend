@@ -30,6 +30,12 @@ coverage/
 .tmp/
 .nyc_output/
 
+# ───────── Playwright e2e artifacts ─────────
+test-results/
+playwright-report/
+playwright/.cache/
+tests/e2e/.snapshots/
+
 # ───────── Prisma generated client (always regenerated) ─────────
 node_modules/.prisma/
 node_modules/@prisma/client/
