@@ -1,0 +1,882 @@
+openapi: 3.0.3
+info:
+  title: Vet Clinic API
+  version: 1.0.0
+  description: |
+    O‘zbekiston bo‘yicha veterinariya klinikalarini joylashuv (radius) bo‘yicha qidirish,
+    ish vaqti (Asia/Tashkent vaqt zonasi), telefon, sharhlar va JWT asosidagi
+    autentifikatsiya (access + refresh, **rotation**, **reuse-detection**) ta’minlovchi REST API.
+
+    ## Javob konvensiyasi
+    - **Muvaffaqiyat:** `{ "success": true, "data": ... }`
+    - **Xato:** `{ "success": false, "error": { "code", "message", "details?" }, "meta": { "requestId" } }`
+
+    ## Autentifikatsiya
+    Himoyalangan endpointlarga `Authorization: Bearer <accessToken>` sarlavhasi bilan murojaat qiling.
+    `accessToken` muddati tugasa, `/auth/refresh` orqali yangilang — eski refresh token
+    avtomatik bekor qilinadi (rotation). Bekor qilingan refresh qaytadan ishlatilsa,
+    foydalanuvchining barcha sessiyalari bekor qilinadi.
+
+  contact:
+    name: API Support
+  license:
+    name: ISC
+
+servers:
+  - url: http://localhost:4000/api/v1
+    description: Local (run-time’da `API_PUBLIC_URL` asosida yangilanadi)
+
+tags:
+  - name: Health
+    description: Servis holati va versiya
+  - name: Auth
+    description: Ro‘yxatdan o‘tish, kirish, token yangilash, chiqish
+  - name: Clinics
+    description: Klinikalar va sharhlar
+  - name: Admin
+    description: Faqat ADMIN roli uchun — boshqaruv endpointlari
+
+security: []
+
+paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: Servis holati
+      operationId: healthCheck
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Ro‘yxatdan o‘tish
+      operationId: authRegister
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Foydalanuvchi yaratildi
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokensEnvelope'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Tizimga kirish
+      operationId: authLogin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokensEnvelope'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Access tokenni yangilash (rotation + reuse-detection)
+      operationId: authRefresh
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+      responses:
+        '200':
+          description: Yangi access + refresh juftligi
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokensEnvelope'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Refresh sessiyasini bekor qilish
+      operationId: authLogout
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LogoutRequest'
+      responses:
+        '200':
+          description: OK (token taqdim etilmagan bo‘lsa ham 200)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkEnvelope'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /clinics/nearby:
+    get:
+      tags: [Clinics]
+      summary: Radius bo‘yicha yaqin klinikalar
+      description: |
+        Foydalanuvchi joylashuvi (`lat`, `lng`) atrofidagi klinikalarni
+        masofaga ko‘ra tartiblangan ro‘yxat ko‘rinishida qaytaradi.
+      operationId: clinicsNearby
+      parameters:
+        - in: query
+          name: lat
+          required: true
+          description: Kenglik (-90..90)
+          schema:
+            type: number
+            format: double
+            minimum: -90
+            maximum: 90
+          example: 41.31
+        - in: query
+          name: lng
+          required: true
+          description: Uzunlik (-180..180)
+          schema:
+            type: number
+            format: double
+            minimum: -180
+            maximum: 180
+          example: 69.25
+        - in: query
+          name: radiusKm
+          required: false
+          description: Radius (km), default 10, maksimum 200
+          schema:
+            type: number
+            format: double
+            default: 10
+            minimum: 0.01
+            maximum: 200
+          example: 5
+      responses:
+        '200':
+          description: Klinikalar (masofa bo‘yicha o‘sib boruvchi)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClinicsNearbyEnvelope'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /clinics/{id}:
+    get:
+      tags: [Clinics]
+      summary: Klinika tafsilotlari
+      operationId: clinicById
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Klinika va sharhlar (oxirgi 50 ta)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClinicDetailEnvelope'
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /admin/dashboard:
+    get:
+      tags: [Admin]
+      summary: Boshqaruv statistikasi
+      operationId: adminDashboard
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminDashboardEnvelope' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /admin/clinics:
+    get:
+      tags: [Admin]
+      summary: Klinikalar ro‘yxati (sahifalashtirilgan)
+      operationId: adminListClinics
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Search'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminClinicsListEnvelope' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Admin]
+      summary: Yangi klinika yaratish
+      operationId: adminCreateClinic
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminClinicCreateRequest' }
+      responses:
+        '201':
+          description: Yaratildi
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminClinicEnvelope' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /admin/clinics/{id}:
+    get:
+      tags: [Admin]
+      summary: Klinika ma’lumoti (admin ko‘rinish)
+      operationId: adminGetClinic
+      security: [{ bearerAuth: [] }]
+      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminClinicEnvelope' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Admin]
+      summary: Klinikani yangilash
+      operationId: adminUpdateClinic
+      security: [{ bearerAuth: [] }]
+      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminClinicUpdateRequest' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminClinicEnvelope' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Admin]
+      summary: Klinikani o‘chirish
+      operationId: adminDeleteClinic
+      security: [{ bearerAuth: [] }]
+      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OkEnvelope' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /admin/reviews:
+    get:
+      tags: [Admin]
+      summary: Sharhlar ro‘yxati
+      operationId: adminListReviews
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Search'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminReviewsListEnvelope' }
+
+  /admin/reviews/{id}:
+    delete:
+      tags: [Admin]
+      summary: Sharhni o‘chirish
+      operationId: adminDeleteReview
+      security: [{ bearerAuth: [] }]
+      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OkEnvelope' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /admin/users:
+    get:
+      tags: [Admin]
+      summary: Foydalanuvchilar ro‘yxati
+      operationId: adminListUsers
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Search'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminUsersListEnvelope' }
+
+  /admin/users/{id}/role:
+    patch:
+      tags: [Admin]
+      summary: Foydalanuvchi rolini o‘zgartirish
+      operationId: adminUpdateUserRole
+      security: [{ bearerAuth: [] }]
+      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties:
+                role: { type: string, enum: [USER, ADMIN] }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminUserEnvelope' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /admin/users/{id}:
+    delete:
+      tags: [Admin]
+      summary: Foydalanuvchini o‘chirish
+      operationId: adminDeleteUser
+      security: [{ bearerAuth: [] }]
+      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OkEnvelope' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /clinics/{id}/reviews:
+    post:
+      tags: [Clinics]
+      summary: Sharh qoldirish (yoki mavjudini yangilash)
+      description: |
+        Har bir foydalanuvchi bitta klinikaga **bitta** sharh qoldira oladi.
+        Qaytadan yuborilsa, oldingi sharh `rating` va `comment` qiymatlariga yangilanadi.
+      operationId: clinicCreateReview
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewCreateRequest'
+      responses:
+        '201':
+          description: Sharh yaratildi yoki yangilandi
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewEnvelope'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+components:
+  parameters:
+    Page:
+      in: query
+      name: page
+      required: false
+      schema: { type: integer, minimum: 1, default: 1 }
+    PageSize:
+      in: query
+      name: pageSize
+      required: false
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    Search:
+      in: query
+      name: q
+      required: false
+      schema: { type: string, minLength: 1, maxLength: 120 }
+      description: Erkin matnli qidiruv
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        Login/Refresh javobidan olingan `accessToken` ni yuboring:
+        `Authorization: Bearer <accessToken>`
+
+  responses:
+    BadRequest:
+      description: Validatsiya yoki noto‘g‘ri so‘rov
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            validation:
+              value:
+                success: false
+                error:
+                  code: VALIDATION_ERROR
+                  message: Validatsiya xatosi
+                  details:
+                    fieldErrors:
+                      email: ['Email noto‘g‘ri formatda']
+                meta: { requestId: 5d2c8b80-2e6a-4b1f-91f0-7c2c6b4f1abc }
+    Unauthorized:
+      description: Token yo‘q, yaroqsiz yoki muddati tugagan
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            expired:
+              value:
+                success: false
+                error:
+                  code: TOKEN_EXPIRED
+                  message: Access token muddati tugagan
+                meta: { requestId: 5d2c8b80-2e6a-4b1f-91f0-7c2c6b4f1abc }
+    Forbidden:
+      description: Ruxsat yo‘q (rol yetarli emas)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    NotFound:
+      description: Resurs topilmadi
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    Conflict:
+      description: Konflikt (masalan, email band)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    TooManyRequests:
+      description: Rate limit
+      headers:
+        RateLimit-Limit: { schema: { type: integer } }
+        RateLimit-Remaining: { schema: { type: integer } }
+        RateLimit-Reset: { schema: { type: integer } }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  schemas:
+    Meta:
+      type: object
+      properties:
+        requestId:
+          type: string
+          nullable: true
+          example: 5d2c8b80-2e6a-4b1f-91f0-7c2c6b4f1abc
+
+    ErrorResponse:
+      type: object
+      required: [success, error, meta]
+      properties:
+        success: { type: boolean, example: false }
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              example: VALIDATION_ERROR
+              description: |
+                Mumkin bo‘lgan kodlar (to‘liq emas):
+                `VALIDATION_ERROR`, `UNAUTHORIZED`, `INVALID_TOKEN`, `TOKEN_EXPIRED`,
+                `INVALID_CREDENTIALS`, `INVALID_REFRESH`, `REFRESH_REUSED`, `REFRESH_EXPIRED`,
+                `EMAIL_EXISTS`, `CLINIC_NOT_FOUND`, `NOT_FOUND`, `CONFLICT`, `RATE_LIMIT`,
+                `AUTH_RATE_LIMIT`, `INVALID_JSON`, `PAYLOAD_TOO_LARGE`, `INTERNAL_ERROR`.
+            message: { type: string }
+            details:
+              description: Zod yoki qo‘shimcha tafsilot (fieldErrors va h.k.)
+              nullable: true
+        meta: { $ref: '#/components/schemas/Meta' }
+
+    HealthResponse:
+      type: object
+      properties:
+        success: { type: boolean, example: true }
+        data:
+          type: object
+          properties:
+            status: { type: string, example: ok }
+            service: { type: string, example: vet-clinic-api }
+            version: { type: string, example: 1.0.0 }
+            startedAt: { type: string, format: date-time }
+            uptimeSec: { type: integer, example: 1234 }
+            docs:
+              type: string
+              nullable: true
+              example: http://localhost:4000/docs
+
+    PublicUser:
+      type: object
+      required: [id, email]
+      properties:
+        id: { type: string, example: clu1xv8z00000abcd1234efgh }
+        email: { type: string, format: email, example: vet@example.com }
+        name: { type: string, nullable: true, example: Akmal }
+
+    AuthPayload:
+      type: object
+      required: [user, accessToken, refreshToken]
+      properties:
+        user: { $ref: '#/components/schemas/PublicUser' }
+        accessToken:
+          type: string
+          example: eyJhbGciOi...
+        refreshToken:
+          type: string
+          description: 96-belgili hex string (server tomonida SHA-256 hash bilan saqlanadi)
+          example: 3b2f5c...d9e1
+
+    AuthTokensEnvelope:
+      type: object
+      properties:
+        success: { type: boolean, example: true }
+        data: { $ref: '#/components/schemas/AuthPayload' }
+
+    RegisterRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email, example: vet@example.com }
+        password: { type: string, minLength: 8, maxLength: 128, example: StrongP@ss1 }
+        name: { type: string, minLength: 1, maxLength: 120, example: Akmal }
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email, example: vet@example.com }
+        password: { type: string, minLength: 1, maxLength: 128, example: StrongP@ss1 }
+
+    RefreshRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken: { type: string, minLength: 20 }
+
+    LogoutRequest:
+      type: object
+      properties:
+        refreshToken: { type: string, minLength: 20 }
+
+    OkEnvelope:
+      type: object
+      properties:
+        success: { type: boolean, example: true }
+        data:
+          type: object
+          properties:
+            ok: { type: boolean, example: true }
+
+    OpeningSlot:
+      type: object
+      nullable: true
+      description: 24-soat formatdagi ish vaqti yoki `null` (yopiq)
+      properties:
+        open: { type: string, example: '09:00' }
+        close: { type: string, example: '19:00' }
+
+    OpeningHours:
+      type: object
+      description: Hafta kunlari bo‘yicha ish vaqti (`null` — yopiq kun)
+      properties:
+        mon: { $ref: '#/components/schemas/OpeningSlot' }
+        tue: { $ref: '#/components/schemas/OpeningSlot' }
+        wed: { $ref: '#/components/schemas/OpeningSlot' }
+        thu: { $ref: '#/components/schemas/OpeningSlot' }
+        fri: { $ref: '#/components/schemas/OpeningSlot' }
+        sat: { $ref: '#/components/schemas/OpeningSlot' }
+        sun: { $ref: '#/components/schemas/OpeningSlot' }
+
+    ClinicSummary:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string, example: Vet Service Chilonzor }
+        phone: { type: string, example: '+998 71 123 45 67' }
+        address: { type: string, example: Chilonzor-9, Toshkent }
+        city: { type: string, example: Toshkent }
+        latitude: { type: number, format: double, example: 41.285 }
+        longitude: { type: number, format: double, example: 69.204 }
+        distanceKm: { type: number, format: double, example: 1.27 }
+        isOpenNow: { type: boolean, example: true }
+        todayHours: { $ref: '#/components/schemas/OpeningSlot' }
+        averageRating:
+          type: number
+          format: double
+          nullable: true
+          example: 4.6
+        reviewCount: { type: integer, example: 12 }
+
+    ClinicsNearbyEnvelope:
+      type: object
+      properties:
+        success: { type: boolean, example: true }
+        data:
+          type: object
+          properties:
+            clinics:
+              type: array
+              items: { $ref: '#/components/schemas/ClinicSummary' }
+
+    ClinicDetail:
+      type: object
+      description: Klinika to‘liq ma’lumoti (masofasiz)
+      properties:
+        id: { type: string }
+        name: { type: string }
+        phone: { type: string }
+        address: { type: string }
+        city: { type: string }
+        latitude: { type: number, format: double }
+        longitude: { type: number, format: double }
+        openingHours: { $ref: '#/components/schemas/OpeningHours' }
+        todayHours: { $ref: '#/components/schemas/OpeningSlot' }
+        isOpenNow: { type: boolean }
+        averageRating:
+          type: number
+          format: double
+          nullable: true
+        reviewCount: { type: integer }
+        reviews:
+          type: array
+          items: { $ref: '#/components/schemas/ReviewPublic' }
+
+    ClinicDetailEnvelope:
+      type: object
+      properties:
+        success: { type: boolean, example: true }
+        data: { $ref: '#/components/schemas/ClinicDetail' }
+
+    ReviewPublic:
+      type: object
+      properties:
+        id: { type: string }
+        rating: { type: integer, minimum: 1, maximum: 5, example: 5 }
+        comment: { type: string, nullable: true, example: Juda yaxshi xizmat }
+        createdAt: { type: string, format: date-time }
+        user:
+          type: object
+          properties:
+            id: { type: string }
+            name: { type: string, nullable: true }
+            email:
+              type: string
+              description: Maskalangan email (masalan, `va***@example.com`)
+              example: va***@example.com
+
+    ReviewCreateRequest:
+      type: object
+      required: [rating]
+      properties:
+        rating: { type: integer, minimum: 1, maximum: 5, example: 5 }
+        comment: { type: string, maxLength: 2000, example: Tez va sifatli xizmat }
+
+    ReviewEnvelope:
+      type: object
+      properties:
+        success: { type: boolean, example: true }
+        data: { $ref: '#/components/schemas/ReviewPublic' }
+
+    # ───────── ADMIN SCHEMAS ─────────
+    Pagination:
+      type: object
+      properties:
+        total: { type: integer, example: 42 }
+        page: { type: integer, example: 1 }
+        pageSize: { type: integer, example: 20 }
+
+    AdminClinic:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        phone: { type: string }
+        address: { type: string }
+        city: { type: string }
+        latitude: { type: number, format: double }
+        longitude: { type: number, format: double }
+        openingHours: { $ref: '#/components/schemas/OpeningHours' }
+        reviewCount: { type: integer }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    AdminClinicEnvelope:
+      type: object
+      properties:
+        success: { type: boolean, example: true }
+        data: { $ref: '#/components/schemas/AdminClinic' }
+
+    AdminClinicsListEnvelope:
+      type: object
+      properties:
+        success: { type: boolean, example: true }
+        data:
+          allOf:
+            - $ref: '#/components/schemas/Pagination'
+            - type: object
+              properties:
+                items:
+                  type: array
+                  items: { $ref: '#/components/schemas/AdminClinic' }
+
+    AdminClinicCreateRequest:
+      type: object
+      required: [name, phone, address, city, latitude, longitude, openingHours]
+      properties:
+        name: { type: string, minLength: 2, maxLength: 160 }
+        phone: { type: string, minLength: 5, maxLength: 40 }
+        address: { type: string, minLength: 2, maxLength: 255 }
+        city: { type: string, minLength: 2, maxLength: 80 }
+        latitude: { type: number, format: double, minimum: -90, maximum: 90 }
+        longitude: { type: number, format: double, minimum: -180, maximum: 180 }
+        openingHours: { $ref: '#/components/schemas/OpeningHours' }
+
+    AdminClinicUpdateRequest:
+      type: object
+      properties:
+        name: { type: string }
+        phone: { type: string }
+        address: { type: string }
+        city: { type: string }
+        latitude: { type: number, format: double }
+        longitude: { type: number, format: double }
+        openingHours: { $ref: '#/components/schemas/OpeningHours' }
+
+    AdminUser:
+      type: object
+      properties:
+        id: { type: string }
+        email: { type: string, format: email }
+        name: { type: string, nullable: true }
+        role: { type: string, enum: [USER, ADMIN] }
+        reviewCount: { type: integer }
+        createdAt: { type: string, format: date-time }
+
+    AdminUserEnvelope:
+      type: object
+      properties:
+        success: { type: boolean, example: true }
+        data: { $ref: '#/components/schemas/AdminUser' }
+
+    AdminUsersListEnvelope:
+      type: object
+      properties:
+        success: { type: boolean, example: true }
+        data:
+          allOf:
+            - $ref: '#/components/schemas/Pagination'
+            - type: object
+              properties:
+                items:
+                  type: array
+                  items: { $ref: '#/components/schemas/AdminUser' }
+
+    AdminReview:
+      type: object
+      properties:
+        id: { type: string }
+        rating: { type: integer, minimum: 1, maximum: 5 }
+        comment: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+        clinic:
+          type: object
+          nullable: true
+          properties:
+            id: { type: string }
+            name: { type: string }
+        user:
+          type: object
+          nullable: true
+          properties:
+            id: { type: string }
+            email: { type: string, format: email }
+            name: { type: string, nullable: true }
+
+    AdminReviewsListEnvelope:
+      type: object
+      properties:
+        success: { type: boolean, example: true }
+        data:
+          allOf:
+            - $ref: '#/components/schemas/Pagination'
+            - type: object
+              properties:
+                items:
+                  type: array
+                  items: { $ref: '#/components/schemas/AdminReview' }
+
+    AdminDashboardEnvelope:
+      type: object
+      properties:
+        success: { type: boolean, example: true }
+        data:
+          type: object
+          properties:
+            counts:
+              type: object
+              properties:
+                users: { type: integer }
+                clinics: { type: integer }
+                reviews: { type: integer }
+            latestReviews:
+              type: array
+              items: { $ref: '#/components/schemas/AdminReview' }

@@ -1,0 +1,79 @@
+// Vet Clinic API — Postgres schema
+// Production: Neon (Serverless Postgres) + Railway
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  // Neon-style pooled URL (PgBouncer) `DATABASE_URL` da, migratsiya uchun direct URL `DATABASE_DIRECT_URL` da
+  directUrl = env("DATABASE_DIRECT_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+model User {
+  id            String         @id @default(cuid())
+  email         String         @unique
+  passwordHash  String
+  name          String?
+  role          Role           @default(USER)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  refreshTokens RefreshToken[]
+  reviews       Review[]
+
+  @@index([role])
+}
+
+model RefreshToken {
+  id        String    @id @default(cuid())
+  tokenHash String    @unique
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Clinic {
+  id           String   @id @default(cuid())
+  name         String
+  phone        String
+  address      String
+  city         String
+  latitude     Float
+  longitude    Float
+  /// JSON: { "mon": { "open":"09:00","close":"19:00" } | null, ... }
+  openingHours Json
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  reviews      Review[]
+
+  @@index([city])
+  @@index([latitude, longitude])
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  clinicId  String
+  clinic    Clinic   @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([clinicId, userId])
+  @@index([clinicId])
+  @@index([userId])
+}

@@ -1,0 +1,57 @@
+{
+  "name": "vetclinicbacken",
+  "version": "1.0.0",
+  "description": "O‘zbekiston veterinariya klinikalari API (Express + Postgres + Prisma)",
+  "main": "src/server.js",
+  "engines": {
+    "node": ">=20.0.0 <23.0.0",
+    "npm": ">=10.0.0"
+  },
+  "scripts": {
+    "dev": "nodemon src/server.js",
+    "start": "node src/server.js",
+    "start:prod": "prisma migrate deploy && node src/server.js",
+    "build": "prisma generate",
+    "postinstall": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:migrate:deploy": "prisma migrate deploy",
+    "db:reset": "prisma migrate reset",
+    "db:seed": "node prisma/seed.js",
+    "db:studio": "prisma studio"
+  },
+  "keywords": [
+    "vet",
+    "clinic",
+    "express",
+    "postgres",
+    "prisma",
+    "uzbekistan",
+    "openapi",
+    "railway"
+  ],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@prisma/client": "^6.8.2",
+    "bcryptjs": "^3.0.2",
+    "compression": "^1.8.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.5.0",
+    "express": "^5.2.1",
+    "express-rate-limit": "^7.5.0",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.0",
+    "swagger-ui-express": "^5.0.1",
+    "yaml": "^2.7.0",
+    "zod": "^3.24.4"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10",
+    "prisma": "^6.8.2"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.js"
+  }
+}

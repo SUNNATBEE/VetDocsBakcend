@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Vet Clinic — Admin Panel</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div id="app" data-state="loading">
+    <!-- LOGIN -->
+    <section id="login" class="auth">
+      <form id="loginForm" class="card auth__card" autocomplete="on">
+        <div class="brand">
+          <div class="brand__logo">VC</div>
+          <div>
+            <h1>Vet Clinic Admin</h1>
+            <p class="muted">ADMIN roli bilan kiring</p>
+          </div>
+        </div>
+        <label>Email
+          <input type="email" name="email" required autocomplete="email" placeholder="admin@vetclinic.uz" />
+        </label>
+        <label>Parol
+          <input type="password" name="password" required autocomplete="current-password" placeholder="••••••••" />
+        </label>
+        <button type="submit" class="btn btn--primary btn--block">Kirish</button>
+        <p id="loginError" class="error" hidden></p>
+      </form>
+    </section>
+
+    <!-- SHELL -->
+    <section id="shell" class="shell" hidden>
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand__logo">VC</div>
+          <div>
+            <h1>Vet Clinic</h1>
+            <p class="muted">Admin paneli</p>
+          </div>
+        </div>
+        <nav class="nav">
+          <a href="#dashboard" data-route="dashboard">📊 Boshqaruv</a>
+          <a href="#clinics" data-route="clinics">🏥 Klinikalar</a>
+          <a href="#reviews" data-route="reviews">💬 Sharhlar</a>
+          <a href="#users" data-route="users">👤 Foydalanuvchilar</a>
+        </nav>
+        <div class="sidebar__foot">
+          <div id="meBox" class="me"></div>
+          <button id="logoutBtn" class="btn btn--ghost btn--block">Chiqish</button>
+        </div>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <h2 id="pageTitle">Boshqaruv</h2>
+          <div class="topbar__right">
+            <input id="searchInput" class="input" placeholder="Qidirish..." hidden />
+            <button id="primaryAction" class="btn btn--primary" hidden></button>
+          </div>
+        </header>
+        <div id="view" class="view"></div>
+      </main>
+    </section>
+
+    <!-- MODAL -->
+    <div id="modal" class="modal" hidden>
+      <div class="modal__backdrop" data-close></div>
+      <div class="modal__panel card">
+        <header class="modal__head">
+          <h3 id="modalTitle">Modal</h3>
+          <button class="btn btn--ghost" data-close>×</button>
+        </header>
+        <div id="modalBody" class="modal__body"></div>
+      </div>
+    </div>
+
+    <!-- TOAST -->
+    <div id="toast" class="toast" hidden></div>
+  </div>
+
+  <script src="./app.js" defer></script>
+</body>
+</html>
