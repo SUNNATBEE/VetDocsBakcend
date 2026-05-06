@@ -29,7 +29,11 @@ const clinicCreateSchema = z.object({
   openingHours: openingHoursSchema,
 });
 
-const clinicUpdateSchema = clinicCreateSchema.partial();
+const clinicUpdateSchema = clinicCreateSchema
+  .partial()
+  .refine((obj) => Object.keys(obj).length > 0, {
+    message: 'Kamida bitta maydon yuborilishi kerak',
+  });
 
 const idParamSchema = z.object({
   id: z.string().min(1, 'id majburiy'),

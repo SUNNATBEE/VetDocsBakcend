@@ -2,63 +2,88 @@ openapi: 3.0.3
 info:
   title: Vet Clinic API
   version: 1.0.0
+  summary: O'zbekiston bo'yicha veterinariya klinikalari uchun REST API.
   description: |
-    O‘zbekiston bo‘yicha veterinariya klinikalarini joylashuv (radius) bo‘yicha qidirish,
-    ish vaqti (Asia/Tashkent vaqt zonasi), telefon, sharhlar va JWT asosidagi
-    autentifikatsiya (access + refresh, **rotation**, **reuse-detection**) ta’minlovchi REST API.
+    Veterinariya klinikalarini joylashuv (radius) bo'yicha qidirish, ish vaqti
+    (Asia/Tashkent), telefon, sharhlar va JWT autentifikatsiyasi (access +
+    rotating refresh, reuse-detection) ta'minlovchi backend.
 
     ## Javob konvensiyasi
-    - **Muvaffaqiyat:** `{ "success": true, "data": ... }`
-    - **Xato:** `{ "success": false, "error": { "code", "message", "details?" }, "meta": { "requestId" } }`
+
+    Barcha javoblar yagona "envelope" formatida qaytadi:
+
+    | Holat        | Shakl                                                                                       |
+    | ------------ | ------------------------------------------------------------------------------------------- |
+    | Muvaffaqiyat | `{ "success": true, "data": ... }`                                                          |
+    | Xato         | `{ "success": false, "error": { "code", "message", "details?" }, "meta": { "requestId" } }` |
 
     ## Autentifikatsiya
-    Himoyalangan endpointlarga `Authorization: Bearer <accessToken>` sarlavhasi bilan murojaat qiling.
-    `accessToken` muddati tugasa, `/auth/refresh` orqali yangilang — eski refresh token
-    avtomatik bekor qilinadi (rotation). Bekor qilingan refresh qaytadan ishlatilsa,
-    foydalanuvchining barcha sessiyalari bekor qilinadi.
 
-    ## So’rovni qanday yuborish (juda sodda)
-    1. Kerakli endpointni tanlang (`GET`, `POST`, `PATCH`, `DELETE`).
-    2. Agar `POST/PATCH` bo’lsa, pastdagi `Request body`ga JSON yozing.
-    3. Agar qulf belgisi bo’lsa, avval login qiling va `Authorize`ga token kiriting.
-    4. `Try it out` -> `Execute` bosing.
-    5. Javobda `success: true` bo’lsa, hammasi yaxshi.
+    Himoyalangan endpointlarga `Authorization: Bearer <accessToken>` sarlavhasi
+    bilan murojaat qiling. Access token muddati tugasa, `/auth/refresh` orqali
+    yangilang — eski refresh token avtomatik bekor qilinadi (rotation). Bekor
+    qilingan refresh qaytadan ishlatilsa, foydalanuvchining barcha sessiyalari
+    bekor qilinadi (reuse-detection).
+
+    ## Tezkor boshlash
+
+    1. `POST /auth/register` yoki `POST /auth/login` orqali `accessToken` oling.
+    2. Yuqoridagi **Authorize** tugmasini bosing va tokenni kiriting.
+    3. Endpointni tanlang -> `Try it out` -> `Execute`.
+    4. Response panelida `success: true` bo'lsa — hammasi yaxshi.
 
     ## cURL bilan tez sinash
-    Quyidagi misollarda `BASE_URL` o’rniga o’z server manzilingizni qo’ying:
-    - Production: `https://vetclinicbackend.up.railway.app/api/v1`
-    - Lokal: `http://localhost:4000/api/v1`
 
-    ## Postman’da 1 daqiqada test qilish
-    1. Postman oching -> `New` -> `HTTP Request`.
-    2. URL yozing: `https://vetclinicbackend.up.railway.app/api/v1/health`.
-    3. Method: `GET` -> `Send` bosing (health ishlasa API tirik).
-    4. Login uchun `POST /auth/login` yuboring (`Body -> raw -> JSON`).
-    5. Javobdan `accessToken`ni oling.
-    6. Himoyalangan endpointlarda `Authorization -> Bearer Token`ga shu tokenni qo’ying.
-    7. Masalan `GET /admin/dashboard` yuborib tekshiring (admin token bo’lsa ishlaydi).
+    Quyidagi misollarda `BASE_URL` o'rniga muhitingizga mos manzilni qo'ying:
+
+    - Production: `https://vetclinicbackend.up.railway.app/api/v1`
+    - Lokal:      `http://localhost:4000/api/v1`
+
+    ```bash
+    BASE_URL="https://vetclinicbackend.up.railway.app/api/v1"
+    curl "$BASE_URL/health"
+    ```
+
+    ## Postman'da 1 daqiqada test
+
+    1. `New` -> `HTTP Request` -> `GET {BASE_URL}/health` -> `Send`. Servis tirik.
+    2. `POST {BASE_URL}/auth/login` (`Body -> raw -> JSON`) -> `accessToken`ni nusxalang.
+    3. Himoyalangan so'rovlarda `Authorization -> Bearer Token`ga shu tokenni qo'ying.
+    4. Masalan, `GET {BASE_URL}/admin/dashboard` (admin token bilan).
+
+    ## Rate limit
+
+    Global limiter — `300 / 15 daqiqa`, `/auth/*` uchun alohida `40 / 15 daqiqa`.
+    Limit oshib ketsa `429 RATE_LIMIT` (yoki `429 AUTH_RATE_LIMIT`) qaytadi va
+    `RateLimit-*` sarlavhalarida qolgan kvota ko'rsatiladi.
 
   contact:
-    name: API Support
-    email: support@vetclinic.uz
-    url: https://vetclinic.uz/support
+    name: Vet Clinic API Support
+    email: yusupovsunnatbek32@gmail.com
+    url: https://github.com/SUNNATBEE/VetDocsBakcend
   license:
     name: ISC
     url: https://opensource.org/licenses/ISC
 
+externalDocs:
+  description: Loyihaning manba kodi (GitHub)
+  url: https://github.com/SUNNATBEE/VetDocsBakcend
+
 servers:
+  - url: https://vetclinicbackend.up.railway.app/api/v1
+    description: Production (Railway)
   - url: http://localhost:4000/api/v1
-    description: Local (run-time’da `API_PUBLIC_URL` asosida yangilanadi)
+    description: Lokal ishlab chiqish
 
 tags:
   - name: Health
-    description: Servis holati va versiya
+    description: Servis holati va versiya — monitoring va healthcheck uchun.
   - name: Auth
-    description: Ro‘yxatdan o‘tish, kirish, token yangilash, chiqish
+    description: Ro'yxatdan o'tish, kirish, token yangilash, chiqish.
   - name: Clinics
-    description: Klinikalar va sharhlar
+    description: Klinikalarni qidirish, batafsil ko'rish va sharh qoldirish.
   - name: Admin
-    description: Faqat ADMIN roli uchun — boshqaruv endpointlari
+    description: Faqat `ADMIN` roli uchun — boshqaruv endpointlari.
 
 security: []
 
@@ -68,39 +93,48 @@ paths:
       tags: [Health]
       summary: Servis holati
       description: |
-        Bu endpoint server tirikligini tekshiradi.
-        Hech qanday login yoki body kerak emas.
-        Faqat `GET /health` yuborasiz.
-        Javobda: `status`, `version`, `uptimeSec`, `docs` qaytadi.
-        
-        cURL:
+        Server tirikligini tekshiradi. Hech qanday autentifikatsiya talab qilinmaydi.
+        Javobda: `status`, `service`, `version`, `startedAt`, `uptimeSec`, `docs`.
+
         ```bash
-        curl -X GET "$BASE_URL/health"
+        curl "$BASE_URL/health"
         ```
       operationId: healthCheck
       responses:
         '200':
-          description: OK
+          description: Servis ishlamoqda.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/HealthResponse'
+              examples:
+                ok:
+                  summary: Tirik servis
+                  value:
+                    success: true
+                    data:
+                      status: ok
+                      service: vet-clinic-api
+                      version: 1.0.0
+                      startedAt: '2026-05-06T08:00:00.000Z'
+                      uptimeSec: 1234
+                      docs: https://vetclinicbackend.up.railway.app/docs
 
   /auth/register:
     post:
       tags: [Auth]
-      summary: Ro‘yxatdan o‘tish
+      summary: Ro'yxatdan o'tish
       description: |
-        Yangi foydalanuvchi ochadi.
-        `email` va `password` yuborish majburiy.
-        So’rov: `POST /auth/register` + JSON body.
-        Javobda: `user`, `accessToken`, `refreshToken` qaytadi.
-        
-        cURL:
+        Yangi foydalanuvchi yaratadi va darhol `accessToken` + `refreshToken` qaytaradi.
+
+        - `email` lowercased va trim qilinadi (ichkarida).
+        - `password` 8..128 belgi.
+        - Email band bo'lsa `409 EMAIL_EXISTS`.
+
         ```bash
         curl -X POST "$BASE_URL/auth/register" \
           -H "Content-Type: application/json" \
-          -d '{"email":"ali@example.com","password":"StrongP@ss1","name":"Ali"}'
+          -d '{"email":"vet@example.com","password":"StrongP@ss1","name":"Akmal"}'
         ```
       operationId: authRegister
       requestBody:
@@ -111,13 +145,17 @@ paths:
               $ref: '#/components/schemas/RegisterRequest'
       responses:
         '201':
-          description: Foydalanuvchi yaratildi
+          description: Foydalanuvchi yaratildi.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AuthTokensEnvelope'
+              examples:
+                created:
+                  $ref: '#/components/examples/AuthTokensExample'
         '400': { $ref: '#/components/responses/BadRequest' }
         '409': { $ref: '#/components/responses/Conflict' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
 
   /auth/login:
@@ -125,16 +163,14 @@ paths:
       tags: [Auth]
       summary: Tizimga kirish
       description: |
-        Mavjud account bilan tizimga kiradi.
-        To’g’ri bo’lsa `accessToken` va `refreshToken` qaytadi.
-        So’rov: `POST /auth/login` + JSON body.
-        Javobda: `user`, `accessToken`, `refreshToken` qaytadi.
-        
-        cURL:
+        Mavjud foydalanuvchi bilan tizimga kiradi. `email`/`password` noto'g'ri
+        bo'lsa, ikki holat ham bitta xato kodini qaytaradi: `401 INVALID_CREDENTIALS`
+        (foydalanuvchi enumeratsiyasiga yo'l qo'ymaslik uchun).
+
         ```bash
         curl -X POST "$BASE_URL/auth/login" \
           -H "Content-Type: application/json" \
-          -d '{"email":"ali@example.com","password":"StrongP@ss1"}'
+          -d '{"email":"vet@example.com","password":"StrongP@ss1"}'
         ```
       operationId: authLogin
       requestBody:
@@ -145,13 +181,17 @@ paths:
               $ref: '#/components/schemas/LoginRequest'
       responses:
         '200':
-          description: OK
+          description: Kirish muvaffaqiyatli.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AuthTokensEnvelope'
+              examples:
+                ok:
+                  $ref: '#/components/examples/AuthTokensExample'
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
 
   /auth/refresh:
@@ -159,12 +199,13 @@ paths:
       tags: [Auth]
       summary: Access tokenni yangilash (rotation + reuse-detection)
       description: |
-        Access token tugaganda yangi token olish uchun ishlatiladi.
-        Body ichida `refreshToken` yuborasiz.
-        So’rov: `POST /auth/refresh` + JSON body.
-        Javobda: yangi `accessToken` va yangi `refreshToken` qaytadi.
-        
-        cURL:
+        Access token muddati tugaganda yangi `access` + `refresh` juftligini oladi.
+
+        - Eski `refreshToken` avtomatik bekor qilinadi (rotation).
+        - Allaqachon bekor qilingan token qayta yuborilsa — barcha sessiyalar
+          bekor qilinadi va `401 REFRESH_REUSED` qaytadi.
+        - Muddati tugagan token: `401 REFRESH_EXPIRED`.
+
         ```bash
         curl -X POST "$BASE_URL/auth/refresh" \
           -H "Content-Type: application/json" \
@@ -179,13 +220,41 @@ paths:
               $ref: '#/components/schemas/RefreshRequest'
       responses:
         '200':
-          description: Yangi access + refresh juftligi
+          description: Yangi access + refresh juftligi.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AuthTokensEnvelope'
+              examples:
+                rotated:
+                  $ref: '#/components/examples/AuthTokensExample'
         '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
+        '401':
+          description: Token yaroqsiz, muddati tugagan yoki reuse-detection ishladi.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+              examples:
+                invalid:
+                  summary: Yaroqsiz refresh token
+                  value:
+                    success: false
+                    error: { code: INVALID_REFRESH, message: Refresh token yaroqsiz }
+                    meta: { requestId: 5d2c8b80-2e6a-4b1f-91f0-7c2c6b4f1abc }
+                expired:
+                  summary: Muddati tugagan
+                  value:
+                    success: false
+                    error: { code: REFRESH_EXPIRED, message: Refresh token muddati tugagan }
+                    meta: { requestId: 5d2c8b80-2e6a-4b1f-91f0-7c2c6b4f1abc }
+                reused:
+                  summary: Bekor qilingan token qayta ishlatildi
+                  value:
+                    success: false
+                    error:
+                      code: REFRESH_REUSED
+                      message: Refresh token qayta ishlatilgan, barcha sessiyalar bekor qilindi
+                    meta: { requestId: 5d2c8b80-2e6a-4b1f-91f0-7c2c6b4f1abc }
         '429': { $ref: '#/components/responses/TooManyRequests' }
 
   /auth/logout:
@@ -193,12 +262,10 @@ paths:
       tags: [Auth]
       summary: Refresh sessiyasini bekor qilish
       description: |
-        Chiqish (logout) qiladi va refresh tokenni bekor qiladi.
-        Body ixtiyoriy, lekin `refreshToken` yuborish tavsiya etiladi.
-        So’rov: `POST /auth/logout`.
-        Javobda: `{ success: true, data: { ok: true } }`.
-        
-        cURL:
+        Best-effort logout: `refreshToken` yuborilsa, mos refresh sessiyasi bekor
+        qilinadi. Body bo'sh bo'lsa ham `200 { ok: true }` qaytadi (token mavjudligini
+        probing qilishga yo'l qo'ymaslik uchun).
+
         ```bash
         curl -X POST "$BASE_URL/auth/logout" \
           -H "Content-Type: application/json" \
@@ -213,25 +280,27 @@ paths:
               $ref: '#/components/schemas/LogoutRequest'
       responses:
         '200':
-          description: OK (token taqdim etilmagan bo‘lsa ham 200)
+          description: Har doim 200 (token bo'lmasa ham).
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/OkEnvelope'
+              examples:
+                ok:
+                  value: { success: true, data: { ok: true } }
         '429': { $ref: '#/components/responses/TooManyRequests' }
 
   /clinics/nearby:
     get:
       tags: [Clinics]
-      summary: Radius bo‘yicha yaqin klinikalar
+      summary: Radius bo'yicha yaqin klinikalar
       description: |
-        Foydalanuvchi joylashuvi (`lat`, `lng`) atrofidagi klinikalarni
-        masofaga ko‘ra tartiblangan ro‘yxat ko‘rinishida qaytaradi.
-        Javobda: `clinics[]` ichida `name`, `distanceKm`, `isOpenNow`, `todayHours`, `averageRating` qaytadi.
-        
-        cURL:
+        Berilgan koordinata (`lat`, `lng`) atrofidagi klinikalarni masofa bo'yicha
+        o'sish tartibida qaytaradi. Har bir element uchun `distanceKm`, `isOpenNow`,
+        `todayHours`, `averageRating`, `reviewCount` qaytadi.
+
         ```bash
-        curl -X GET "$BASE_URL/clinics/nearby?lat=41.31&lng=69.25&radiusKm=5"
+        curl "$BASE_URL/clinics/nearby?lat=41.31&lng=69.25&radiusKm=5"
         ```
       operationId: clinicsNearby
       parameters:
@@ -258,7 +327,7 @@ paths:
         - in: query
           name: radiusKm
           required: false
-          description: Radius (km), default 10, maksimum 200
+          description: Radius (km), default 10, maksimum 200.
           schema:
             type: number
             format: double
@@ -268,11 +337,30 @@ paths:
           example: 5
       responses:
         '200':
-          description: Klinikalar (masofa bo‘yicha o‘sib boruvchi)
+          description: Klinikalar (masofa bo'yicha o'sib boruvchi).
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ClinicsNearbyEnvelope'
+              examples:
+                ok:
+                  summary: Toshkent markazidan 5 km ichida
+                  value:
+                    success: true
+                    data:
+                      clinics:
+                        - id: clu1xv8z00000abcd1234efgh
+                          name: Vet Service Chilonzor
+                          phone: '+998 71 123 45 67'
+                          address: Chilonzor-9, Toshkent
+                          city: Toshkent
+                          latitude: 41.285
+                          longitude: 69.204
+                          distanceKm: 1.27
+                          isOpenNow: true
+                          todayHours: { open: '09:00', close: '19:00' }
+                          averageRating: 4.6
+                          reviewCount: 12
         '400': { $ref: '#/components/responses/BadRequest' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
 
@@ -281,353 +369,23 @@ paths:
       tags: [Clinics]
       summary: Klinika tafsilotlari
       description: |
-        Bitta klinikaning to’liq ma’lumotini qaytaradi (manzil, telefon, sharhlar).
-        URLdagi `{id}` o’rniga klinika ID yoziladi.
-        So’rov: `GET /clinics/{id}`.
-        Javobda: klinika ma’lumoti + `reviews[]` qaytadi.
-        
-        cURL:
+        Bitta klinikaning to'liq ma'lumotini (manzil, telefon, ish vaqti, oxirgi
+        50 sharh) qaytaradi. Sharhlardagi `user.email` xavfsizlik uchun maskalanadi
+        (masalan, `va***@example.com`).
+
         ```bash
-        curl -X GET "$BASE_URL/clinics/CLINIC_ID"
+        curl "$BASE_URL/clinics/CLINIC_ID"
         ```
       operationId: clinicById
       parameters:
         - $ref: '#/components/parameters/IdParam'
       responses:
         '200':
-          description: Klinika va sharhlar (oxirgi 50 ta)
+          description: Klinika va sharhlar (oxirgi 50 ta).
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ClinicDetailEnvelope'
-        '404': { $ref: '#/components/responses/NotFound' }
-        '429': { $ref: '#/components/responses/TooManyRequests' }
-
-  /admin/dashboard:
-    get:
-      tags: [Admin]
-      summary: Boshqaruv statistikasi
-      description: |
-        Faqat ADMIN uchun umumiy statistika (`users`, `clinics`, `reviews`) beradi.
-        Login qiling, `Authorize`ga admin access token kiriting.
-        So’rov: `GET /admin/dashboard`.
-        Javobda: `counts` va `latestReviews[]` qaytadi.
-        
-        cURL:
-        ```bash
-        curl -X GET "$BASE_URL/admin/dashboard" \
-          -H "Authorization: Bearer YOUR_ADMIN_ACCESS_TOKEN"
-        ```
-      operationId: adminDashboard
-      security: [{ bearerAuth: [] }]
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/AdminDashboardEnvelope' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '429': { $ref: '#/components/responses/TooManyRequests' }
-
-  /admin/clinics:
-    get:
-      tags: [Admin]
-      summary: Klinikalar ro‘yxati (sahifalashtirilgan)
-      description: |
-        Faqat ADMIN uchun klinikalar ro’yxatini sahifalab beradi.
-        Query paramlar: `page`, `pageSize`, `q`.
-        So’rov: `GET /admin/clinics?page=1&pageSize=20`.
-        Javobda: `items[]`, `page`, `pageSize`, `total` qaytadi.
-        
-        cURL:
-        ```bash
-        curl -X GET "$BASE_URL/admin/clinics?page=1&pageSize=20" \
-          -H "Authorization: Bearer YOUR_ADMIN_ACCESS_TOKEN"
-        ```
-      operationId: adminListClinics
-      security: [{ bearerAuth: [] }]
-      parameters:
-        - $ref: '#/components/parameters/Page'
-        - $ref: '#/components/parameters/PageSize'
-        - $ref: '#/components/parameters/Search'
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/AdminClinicsListEnvelope' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-    post:
-      tags: [Admin]
-      summary: Yangi klinika yaratish
-      description: |
-        Faqat ADMIN yangi klinika qo’shadi.
-        Kerakli maydonlar: name, phone, address, city, latitude, longitude, openingHours.
-        So’rov: `POST /admin/clinics` + JSON body.
-        Javobda: yaratilgan klinika obyekti qaytadi.
-        
-        cURL:
-        ```bash
-        curl -X POST "$BASE_URL/admin/clinics" \
-          -H "Authorization: Bearer YOUR_ADMIN_ACCESS_TOKEN" \
-          -H "Content-Type: application/json" \
-          -d '{"name":"Vet Service","phone":"+998901234567","address":"Chilonzor","city":"Toshkent","latitude":41.285,"longitude":69.204,"openingHours":{"mon":{"open":"09:00","close":"19:00"}}}'
-        ```
-      operationId: adminCreateClinic
-      security: [{ bearerAuth: [] }]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/AdminClinicCreateRequest' }
-      responses:
-        '201':
-          description: Yaratildi
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/AdminClinicEnvelope' }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '429': { $ref: '#/components/responses/TooManyRequests' }
-
-  /admin/clinics/{id}:
-    get:
-      tags: [Admin]
-      summary: Klinika ma’lumoti (admin ko‘rinish)
-      description: |
-        Faqat ADMIN uchun bitta klinikani ID bo’yicha oladi.
-        So’rov: `GET /admin/clinics/{id}`.
-        Javobda: tanlangan klinika obyekti qaytadi.
-      operationId: adminGetClinic
-      security: [{ bearerAuth: [] }]
-      parameters: [{ $ref: '#/components/parameters/IdParam' }]
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/AdminClinicEnvelope' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '429': { $ref: '#/components/responses/TooManyRequests' }
-    patch:
-      tags: [Admin]
-      summary: Klinikani yangilash
-      description: |
-        Faqat ADMIN klinika maydonlarini yangilaydi.
-        O’zgartirmoqchi bo’lgan maydonlarni bodyga yuboring.
-        So’rov: `PATCH /admin/clinics/{id}` + JSON body.
-        Javobda: yangilangan klinika obyekti qaytadi.
-        
-        cURL:
-        ```bash
-        curl -X PATCH "$BASE_URL/admin/clinics/CLINIC_ID" \
-          -H "Authorization: Bearer YOUR_ADMIN_ACCESS_TOKEN" \
-          -H "Content-Type: application/json" \
-          -d '{"phone":"+998901112233"}'
-        ```
-      operationId: adminUpdateClinic
-      security: [{ bearerAuth: [] }]
-      parameters: [{ $ref: '#/components/parameters/IdParam' }]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/AdminClinicUpdateRequest' }
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/AdminClinicEnvelope' }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '429': { $ref: '#/components/responses/TooManyRequests' }
-    delete:
-      tags: [Admin]
-      summary: Klinikani o‘chirish
-      description: |
-        Faqat ADMIN klinikani o’chiradi.
-        So’rov: `DELETE /admin/clinics/{id}`.
-        Javobda: `{ ok: true }`.
-        
-        cURL:
-        ```bash
-        curl -X DELETE "$BASE_URL/admin/clinics/CLINIC_ID" \
-          -H "Authorization: Bearer YOUR_ADMIN_ACCESS_TOKEN"
-        ```
-      operationId: adminDeleteClinic
-      security: [{ bearerAuth: [] }]
-      parameters: [{ $ref: '#/components/parameters/IdParam' }]
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/OkEnvelope' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '429': { $ref: '#/components/responses/TooManyRequests' }
-
-  /admin/reviews:
-    get:
-      tags: [Admin]
-      summary: Sharhlar ro‘yxati
-      description: |
-        Faqat ADMIN sharhlar ro’yxatini oladi.
-        Query paramlar: `page`, `pageSize`, `q`.
-        So’rov: `GET /admin/reviews`.
-        Javobda: `items[]`, `page`, `pageSize`, `total` qaytadi.
-        
-        cURL:
-        ```bash
-        curl -X GET "$BASE_URL/admin/reviews?page=1&pageSize=20" \
-          -H "Authorization: Bearer YOUR_ADMIN_ACCESS_TOKEN"
-        ```
-      operationId: adminListReviews
-      security: [{ bearerAuth: [] }]
-      parameters:
-        - $ref: '#/components/parameters/Page'
-        - $ref: '#/components/parameters/PageSize'
-        - $ref: '#/components/parameters/Search'
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/AdminReviewsListEnvelope' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '429': { $ref: '#/components/responses/TooManyRequests' }
-
-  /admin/reviews/{id}:
-    delete:
-      tags: [Admin]
-      summary: Sharhni o‘chirish
-      description: |
-        Faqat ADMIN bitta sharhni o’chiradi.
-        So’rov: `DELETE /admin/reviews/{id}`.
-        Javobda: `{ ok: true }`.
-        
-        cURL:
-        ```bash
-        curl -X DELETE "$BASE_URL/admin/reviews/REVIEW_ID" \
-          -H "Authorization: Bearer YOUR_ADMIN_ACCESS_TOKEN"
-        ```
-      operationId: adminDeleteReview
-      security: [{ bearerAuth: [] }]
-      parameters: [{ $ref: '#/components/parameters/IdParam' }]
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/OkEnvelope' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '429': { $ref: '#/components/responses/TooManyRequests' }
-
-  /admin/users:
-    get:
-      tags: [Admin]
-      summary: Foydalanuvchilar ro‘yxati
-      description: |
-        Faqat ADMIN foydalanuvchilar ro’yxatini oladi.
-        Query paramlar: `page`, `pageSize`, `q`.
-        So’rov: `GET /admin/users`.
-        Javobda: `items[]`, `page`, `pageSize`, `total` qaytadi.
-        
-        cURL:
-        ```bash
-        curl -X GET "$BASE_URL/admin/users?page=1&pageSize=20" \
-          -H "Authorization: Bearer YOUR_ADMIN_ACCESS_TOKEN"
-        ```
-      operationId: adminListUsers
-      security: [{ bearerAuth: [] }]
-      parameters:
-        - $ref: '#/components/parameters/Page'
-        - $ref: '#/components/parameters/PageSize'
-        - $ref: '#/components/parameters/Search'
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/AdminUsersListEnvelope' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '429': { $ref: '#/components/responses/TooManyRequests' }
-
-  /admin/users/{id}/role:
-    patch:
-      tags: [Admin]
-      summary: Foydalanuvchi rolini o‘zgartirish
-      description: |
-        Faqat ADMIN foydalanuvchi rolini `USER` yoki `ADMIN`ga o’zgartiradi.
-        So’rov: `PATCH /admin/users/{id}/role` + `{ "role": "ADMIN" }`.
-        Javobda: yangilangan user obyekti qaytadi.
-        
-        cURL:
-        ```bash
-        curl -X PATCH "$BASE_URL/admin/users/USER_ID/role" \
-          -H "Authorization: Bearer YOUR_ADMIN_ACCESS_TOKEN" \
-          -H "Content-Type: application/json" \
-          -d '{"role":"ADMIN"}'
-        ```
-      operationId: adminUpdateUserRole
-      security: [{ bearerAuth: [] }]
-      parameters: [{ $ref: '#/components/parameters/IdParam' }]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/AdminUserRoleUpdateRequest' }
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/AdminUserEnvelope' }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '429': { $ref: '#/components/responses/TooManyRequests' }
-
-  /admin/users/{id}:
-    delete:
-      tags: [Admin]
-      summary: Foydalanuvchini o‘chirish
-      description: |
-        Faqat ADMIN foydalanuvchini tizimdan o’chiradi.
-        So’rov: `DELETE /admin/users/{id}`.
-        Javobda: `{ ok: true }`.
-        
-        cURL:
-        ```bash
-        curl -X DELETE "$BASE_URL/admin/users/USER_ID" \
-          -H "Authorization: Bearer YOUR_ADMIN_ACCESS_TOKEN"
-        ```
-      operationId: adminDeleteUser
-      security: [{ bearerAuth: [] }]
-      parameters: [{ $ref: '#/components/parameters/IdParam' }]
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/OkEnvelope' }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
 
@@ -637,12 +395,9 @@ paths:
       summary: Sharh qoldirish (yoki mavjudini yangilash)
       description: |
         Har bir foydalanuvchi bitta klinikaga **bitta** sharh qoldira oladi.
-        Qaytadan yuborilsa, oldingi sharh `rating` va `comment` qiymatlariga yangilanadi.
-        Login qilgan foydalanuvchi bo’lishi shart (`Bearer` token kerak).
-        So’rov: `POST /clinics/{id}/reviews` + JSON body.
-        Javobda: saqlangan sharh (`id`, `rating`, `comment`, `createdAt`) qaytadi.
-        
-        cURL:
+        Qaytadan yuborilsa, oldingi sharh `rating` va `comment` qiymatlariga
+        yangilanadi (upsert).
+
         ```bash
         curl -X POST "$BASE_URL/clinics/CLINIC_ID/reviews" \
           -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
@@ -662,13 +417,363 @@ paths:
               $ref: '#/components/schemas/ReviewCreateRequest'
       responses:
         '201':
-          description: Sharh yaratildi yoki yangilandi
+          description: Sharh yaratildi yoki yangilandi.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ReviewEnvelope'
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /admin/dashboard:
+    get:
+      tags: [Admin]
+      summary: Boshqaruv statistikasi
+      description: |
+        Faqat `ADMIN` uchun: `users`, `clinics`, `reviews` sonlari va oxirgi 5 sharh.
+
+        ```bash
+        curl "$BASE_URL/admin/dashboard" \
+          -H "Authorization: Bearer YOUR_ADMIN_ACCESS_TOKEN"
+        ```
+      operationId: adminDashboard
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Statistika va oxirgi sharhlar.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminDashboardEnvelope' }
+              examples:
+                ok:
+                  summary: Tipik dashboard javobi
+                  value:
+                    success: true
+                    data:
+                      counts: { users: 128, clinics: 12, reviews: 84 }
+                      latestReviews:
+                        - id: clrev0001
+                          rating: 5
+                          comment: Tez va sifatli xizmat
+                          createdAt: '2026-05-05T12:30:00.000Z'
+                          clinic: { id: clu1xv8z00000abcd1234efgh, name: Vet Service Chilonzor }
+                          user:   { id: clusr0001, email: ali@example.com, name: Ali }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /admin/clinics:
+    get:
+      tags: [Admin]
+      summary: Klinikalar ro'yxati (sahifalashtirilgan)
+      description: |
+        `page`, `pageSize` va ixtiyoriy `q` (erkin matnli qidiruv —
+        `name`, `city`, `address` bo'yicha) bilan filterlanadi.
+      operationId: adminListClinics
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Search'
+      responses:
+        '200':
+          description: Sahifalashtirilgan ro'yxat.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminClinicsListEnvelope' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+    post:
+      tags: [Admin]
+      summary: Yangi klinika yaratish
+      description: |
+        Kerakli maydonlar: `name`, `phone`, `address`, `city`, `latitude`,
+        `longitude`, `openingHours`. `openingHours` to'liq 7 kun bo'lishi shart
+        (yopiq kun — `null`).
+
+        ```bash
+        curl -X POST "$BASE_URL/admin/clinics" \
+          -H "Authorization: Bearer YOUR_ADMIN_ACCESS_TOKEN" \
+          -H "Content-Type: application/json" \
+          -d '{
+                "name":"Vet Service",
+                "phone":"+998901234567",
+                "address":"Chilonzor",
+                "city":"Toshkent",
+                "latitude":41.285,
+                "longitude":69.204,
+                "openingHours":{
+                  "mon":{"open":"09:00","close":"19:00"},
+                  "tue":{"open":"09:00","close":"19:00"},
+                  "wed":{"open":"09:00","close":"19:00"},
+                  "thu":{"open":"09:00","close":"19:00"},
+                  "fri":{"open":"09:00","close":"19:00"},
+                  "sat":{"open":"10:00","close":"15:00"},
+                  "sun":null
+                }
+              }'
+        ```
+      operationId: adminCreateClinic
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminClinicCreateRequest' }
+      responses:
+        '201':
+          description: Klinika yaratildi.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminClinicEnvelope' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /admin/clinics/{id}:
+    get:
+      tags: [Admin]
+      summary: Klinika ma'lumoti (admin ko'rinish)
+      description: ID bo'yicha bitta klinika.
+      operationId: adminGetClinic
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: Klinika ma'lumoti.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminClinicEnvelope' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+    patch:
+      tags: [Admin]
+      summary: Klinikani yangilash
+      description: |
+        Faqat o'zgartirmoqchi bo'lgan maydonlarni yuboring. `openingHours` mavjud
+        bo'lsa — to'liq qayta yoziladi (kun-kun merge qilinmaydi).
+
+        ```bash
+        curl -X PATCH "$BASE_URL/admin/clinics/CLINIC_ID" \
+          -H "Authorization: Bearer YOUR_ADMIN_ACCESS_TOKEN" \
+          -H "Content-Type: application/json" \
+          -d '{"phone":"+998901112233"}'
+        ```
+      operationId: adminUpdateClinic
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminClinicUpdateRequest' }
+      responses:
+        '200':
+          description: Yangilangan klinika.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminClinicEnvelope' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+    delete:
+      tags: [Admin]
+      summary: Klinikani o'chirish
+      description: |
+        Klinikani va unga tegishli sharhlarni (cascade) o'chiradi.
+
+        ```bash
+        curl -X DELETE "$BASE_URL/admin/clinics/CLINIC_ID" \
+          -H "Authorization: Bearer YOUR_ADMIN_ACCESS_TOKEN"
+        ```
+      operationId: adminDeleteClinic
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: O'chirildi.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OkEnvelope' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /admin/reviews:
+    get:
+      tags: [Admin]
+      summary: Sharhlar ro'yxati
+      description: |
+        `q` qidiruvi `comment`, `clinic.name`, `user.email` bo'yicha ishlaydi.
+      operationId: adminListReviews
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Search'
+      responses:
+        '200':
+          description: Sahifalashtirilgan ro'yxat.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminReviewsListEnvelope' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /admin/reviews/{id}:
+    delete:
+      tags: [Admin]
+      summary: Sharhni o'chirish
+      description: |
+        Moderatsiya — admin bitta sharhni o'chirib tashlaydi. Foydalanuvchi
+        o'zining sharhini o'chira olmaydi (siyosat).
+      operationId: adminDeleteReview
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: O'chirildi.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OkEnvelope' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /admin/users:
+    get:
+      tags: [Admin]
+      summary: Foydalanuvchilar ro'yxati
+      description: |
+        `q` qidiruvi `email`, `name` bo'yicha ishlaydi.
+      operationId: adminListUsers
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Search'
+      responses:
+        '200':
+          description: Sahifalashtirilgan ro'yxat.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminUsersListEnvelope' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /admin/users/{id}/role:
+    patch:
+      tags: [Admin]
+      summary: Foydalanuvchi rolini o'zgartirish
+      description: |
+        `USER` <-> `ADMIN` o'zaro almashtirish. Self-protection:
+
+        - O'zingizdan `ADMIN` rolini olib tashlay olmaysiz -> `400 CANNOT_DEMOTE_SELF`.
+
+        ```bash
+        curl -X PATCH "$BASE_URL/admin/users/USER_ID/role" \
+          -H "Authorization: Bearer YOUR_ADMIN_ACCESS_TOKEN" \
+          -H "Content-Type: application/json" \
+          -d '{"role":"ADMIN"}'
+        ```
+      operationId: adminUpdateUserRole
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminUserRoleUpdateRequest' }
+      responses:
+        '200':
+          description: Yangilangan foydalanuvchi.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminUserEnvelope' }
+        '400':
+          description: Validatsiya yoki self-protection xatosi.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+              examples:
+                cannotDemoteSelf:
+                  summary: Admin o'zini demote qilmoqchi
+                  value:
+                    success: false
+                    error:
+                      code: CANNOT_DEMOTE_SELF
+                      message: O'zingizdan ADMIN rolini olib tashlay olmaysiz
+                    meta: { requestId: 5d2c8b80-2e6a-4b1f-91f0-7c2c6b4f1abc }
+                validation:
+                  summary: Noto'g'ri rol qiymati
+                  value:
+                    success: false
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Validatsiya xatosi
+                      details:
+                        fieldErrors:
+                          role: ["USER yoki ADMIN bo'lishi kerak"]
+                    meta: { requestId: 5d2c8b80-2e6a-4b1f-91f0-7c2c6b4f1abc }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /admin/users/{id}:
+    delete:
+      tags: [Admin]
+      summary: Foydalanuvchini o'chirish
+      description: |
+        Foydalanuvchi va uning sharhlari/refresh tokenlari cascade tarzida
+        o'chiriladi. Self-protection: o'zingizni o'chira olmaysiz ->
+        `400 CANNOT_DELETE_SELF`.
+      operationId: adminDeleteUser
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: O'chirildi.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OkEnvelope' }
+        '400':
+          description: Self-protection xatosi.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+              examples:
+                cannotDeleteSelf:
+                  summary: Admin o'zini o'chirmoqchi
+                  value:
+                    success: false
+                    error:
+                      code: CANNOT_DELETE_SELF
+                      message: O'zingizni o'chira olmaysiz
+                    meta: { requestId: 5d2c8b80-2e6a-4b1f-91f0-7c2c6b4f1abc }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
 
@@ -678,23 +783,36 @@ components:
       in: path
       name: id
       required: true
-      schema: { type: string }
+      description: Resurs ID (cuid).
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 64
+      example: clu1xv8z00000abcd1234efgh
+
     Page:
       in: query
       name: page
       required: false
+      description: Sahifa raqami (1 dan boshlanadi).
       schema: { type: integer, minimum: 1, default: 1 }
+      example: 1
+
     PageSize:
       in: query
       name: pageSize
       required: false
+      description: Sahifa hajmi (1..100).
       schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      example: 20
+
     Search:
       in: query
       name: q
       required: false
+      description: Erkin matnli qidiruv (1..120 belgi).
       schema: { type: string, minLength: 1, maxLength: 120 }
-      description: Erkin matnli qidiruv
+      example: chilonzor
 
   securitySchemes:
     bearerAuth:
@@ -702,17 +820,31 @@ components:
       scheme: bearer
       bearerFormat: JWT
       description: |
-        Login/Refresh javobidan olingan `accessToken` ni yuboring:
+        Login yoki Refresh javobidan olingan `accessToken` ni yuboring:
         `Authorization: Bearer <accessToken>`
+
+  examples:
+    AuthTokensExample:
+      summary: Tipik auth javobi
+      value:
+        success: true
+        data:
+          user:
+            id: clusr0001
+            email: vet@example.com
+            name: Akmal
+          accessToken: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+          refreshToken: 3b2f5c7e9a8b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d
 
   responses:
     BadRequest:
-      description: Validatsiya yoki noto‘g‘ri so‘rov
+      description: Validatsiya yoki noto'g'ri so'rov.
       content:
         application/json:
           schema: { $ref: '#/components/schemas/ErrorResponse' }
           examples:
             validation:
+              summary: Zod validatsiya xatosi
               value:
                 success: false
                 error:
@@ -720,59 +852,143 @@ components:
                   message: Validatsiya xatosi
                   details:
                     fieldErrors:
-                      email: ['Email noto‘g‘ri formatda']
+                      email: ["Email noto'g'ri formatda"]
                 meta: { requestId: 5d2c8b80-2e6a-4b1f-91f0-7c2c6b4f1abc }
-            cannotDemoteSelf:
+            invalidJson:
+              summary: Buzilgan JSON tanasi
               value:
                 success: false
-                error:
-                  code: CANNOT_DEMOTE_SELF
-                  message: O‘zingizni ADMIN rolidan tushira olmaysiz
+                error: { code: INVALID_JSON, message: "JSON tanasi noto'g'ri" }
                 meta: { requestId: 5d2c8b80-2e6a-4b1f-91f0-7c2c6b4f1abc }
-            cannotDeleteSelf:
-              value:
-                success: false
-                error:
-                  code: CANNOT_DELETE_SELF
-                  message: O‘zingizni o‘chira olmaysiz
-                meta: { requestId: 5d2c8b80-2e6a-4b1f-91f0-7c2c6b4f1abc }
+
     Unauthorized:
-      description: Token yo‘q, yaroqsiz yoki muddati tugagan
+      description: Token yo'q, yaroqsiz yoki muddati tugagan.
       content:
         application/json:
           schema: { $ref: '#/components/schemas/ErrorResponse' }
           examples:
+            missing:
+              summary: Authorization sarlavhasi yo'q
+              value:
+                success: false
+                error: { code: UNAUTHORIZED, message: Autentifikatsiya talab qilinadi }
+                meta: { requestId: 5d2c8b80-2e6a-4b1f-91f0-7c2c6b4f1abc }
             expired:
+              summary: Access token muddati tugagan
+              value:
+                success: false
+                error: { code: TOKEN_EXPIRED, message: Access token muddati tugagan }
+                meta: { requestId: 5d2c8b80-2e6a-4b1f-91f0-7c2c6b4f1abc }
+            invalid:
+              summary: Yaroqsiz token
+              value:
+                success: false
+                error: { code: INVALID_TOKEN, message: Token yaroqsiz }
+                meta: { requestId: 5d2c8b80-2e6a-4b1f-91f0-7c2c6b4f1abc }
+            invalidCredentials:
+              summary: Login uchun email/parol noto'g'ri
+              value:
+                success: false
+                error: { code: INVALID_CREDENTIALS, message: "Email yoki parol noto'g'ri" }
+                meta: { requestId: 5d2c8b80-2e6a-4b1f-91f0-7c2c6b4f1abc }
+
+    Forbidden:
+      description: Ruxsat yo'q (rol yetarli emas).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            roleRequired:
+              summary: ADMIN roli talab qilinadi
+              value:
+                success: false
+                error: { code: FORBIDDEN, message: "Ushbu amal uchun ruxsat yo'q" }
+                meta: { requestId: 5d2c8b80-2e6a-4b1f-91f0-7c2c6b4f1abc }
+
+    NotFound:
+      description: Resurs topilmadi.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            clinicNotFound:
+              summary: Klinika topilmadi
+              value:
+                success: false
+                error: { code: CLINIC_NOT_FOUND, message: Klinika topilmadi }
+                meta: { requestId: 5d2c8b80-2e6a-4b1f-91f0-7c2c6b4f1abc }
+            userNotFound:
+              summary: Foydalanuvchi topilmadi
+              value:
+                success: false
+                error: { code: USER_NOT_FOUND, message: Foydalanuvchi topilmadi }
+                meta: { requestId: 5d2c8b80-2e6a-4b1f-91f0-7c2c6b4f1abc }
+            reviewNotFound:
+              summary: Sharh topilmadi
+              value:
+                success: false
+                error: { code: REVIEW_NOT_FOUND, message: Sharh topilmadi }
+                meta: { requestId: 5d2c8b80-2e6a-4b1f-91f0-7c2c6b4f1abc }
+
+    Conflict:
+      description: Konflikt (masalan, email band).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            emailExists:
+              summary: Email band
               value:
                 success: false
                 error:
-                  code: TOKEN_EXPIRED
-                  message: Access token muddati tugagan
+                  code: EMAIL_EXISTS
+                  message: "Bunday email allaqachon ro'yxatdan o'tgan"
                 meta: { requestId: 5d2c8b80-2e6a-4b1f-91f0-7c2c6b4f1abc }
-    Forbidden:
-      description: Ruxsat yo‘q (rol yetarli emas)
+
+    PayloadTooLarge:
+      description: So'rov tanasi limitidan oshib ketdi (1 MB).
       content:
         application/json:
           schema: { $ref: '#/components/schemas/ErrorResponse' }
-    NotFound:
-      description: Resurs topilmadi
-      content:
-        application/json:
-          schema: { $ref: '#/components/schemas/ErrorResponse' }
-    Conflict:
-      description: Konflikt (masalan, email band)
-      content:
-        application/json:
-          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            tooLarge:
+              value:
+                success: false
+                error: { code: PAYLOAD_TOO_LARGE, message: "So'rov tanasi juda katta" }
+                meta: { requestId: 5d2c8b80-2e6a-4b1f-91f0-7c2c6b4f1abc }
+
     TooManyRequests:
-      description: Rate limit
+      description: Rate limit oshib ketdi.
       headers:
-        RateLimit-Limit: { schema: { type: integer } }
-        RateLimit-Remaining: { schema: { type: integer } }
-        RateLimit-Reset: { schema: { type: integer } }
+        RateLimit-Limit:
+          description: Oynadagi maksimal so'rovlar soni.
+          schema: { type: integer }
+        RateLimit-Remaining:
+          description: Joriy oynada qolgan so'rovlar soni.
+          schema: { type: integer }
+        RateLimit-Reset:
+          description: Oynaning tugashigacha qolgan soniya.
+          schema: { type: integer }
       content:
         application/json:
           schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            global:
+              summary: Global limit
+              value:
+                success: false
+                error:
+                  code: RATE_LIMIT
+                  message: "Juda ko'p so'rov yuborildi, biroz kuting"
+                meta: { requestId: 5d2c8b80-2e6a-4b1f-91f0-7c2c6b4f1abc }
+            auth:
+              summary: Auth uchun alohida limit
+              value:
+                success: false
+                error:
+                  code: AUTH_RATE_LIMIT
+                  message: "Juda ko'p urinish, keyinroq urinib ko'ring"
+                meta: { requestId: 5d2c8b80-2e6a-4b1f-91f0-7c2c6b4f1abc }
 
   schemas:
     Meta:
@@ -781,38 +997,52 @@ components:
         requestId:
           type: string
           nullable: true
+          description: So'rov bilan bog'liq UUID v4. Loglarda ham shu ID ishlatiladi.
           example: 5d2c8b80-2e6a-4b1f-91f0-7c2c6b4f1abc
 
     ErrorResponse:
       type: object
       required: [success, error, meta]
       properties:
-        success: { type: boolean, example: false }
+        success:
+          type: boolean
+          enum: [false]
+          example: false
         error:
           type: object
           required: [code, message]
           properties:
             code:
               type: string
-              example: VALIDATION_ERROR
               description: |
-                Mumkin bo‘lgan kodlar (to‘liq emas):
-                `VALIDATION_ERROR`, `UNAUTHORIZED`, `INVALID_TOKEN`, `TOKEN_EXPIRED`,
-                `INVALID_CREDENTIALS`, `INVALID_REFRESH`, `REFRESH_REUSED`, `REFRESH_EXPIRED`,
-                `EMAIL_EXISTS`, `CLINIC_NOT_FOUND`, `NOT_FOUND`, `CONFLICT`, `RATE_LIMIT`,
-                `AUTH_RATE_LIMIT`, `INVALID_JSON`, `PAYLOAD_TOO_LARGE`, `INTERNAL_ERROR`.
-            message: { type: string }
+                Mashinaga o'qiladigan xato kodi. Mumkin bo'lgan qiymatlar:
+
+                - **Validatsiya/so'rov:** `VALIDATION_ERROR`, `INVALID_JSON`, `PAYLOAD_TOO_LARGE`, `BAD_REQUEST`
+                - **Auth:** `UNAUTHORIZED`, `INVALID_TOKEN`, `TOKEN_EXPIRED`, `INVALID_CREDENTIALS`,
+                  `INVALID_REFRESH`, `REFRESH_REUSED`, `REFRESH_EXPIRED`, `FORBIDDEN`
+                - **Self-protection:** `CANNOT_DEMOTE_SELF`, `CANNOT_DELETE_SELF`
+                - **Konflikt/topilmadi:** `EMAIL_EXISTS`, `CONFLICT`, `CLINIC_NOT_FOUND`,
+                  `USER_NOT_FOUND`, `REVIEW_NOT_FOUND`, `NOT_FOUND`
+                - **Rate limit:** `RATE_LIMIT`, `AUTH_RATE_LIMIT`
+                - **Server:** `INTERNAL_ERROR`
+              example: VALIDATION_ERROR
+            message:
+              type: string
+              description: O'qish uchun mo'ljallangan, foydalanuvchiga ko'rsatish mumkin bo'lgan xabar (Uzbek).
+              example: Validatsiya xatosi
             details:
-              description: Zod yoki qo‘shimcha tafsilot (fieldErrors va h.k.)
+              description: Qo'shimcha tafsilot (masalan, Zod `fieldErrors`).
               nullable: true
         meta: { $ref: '#/components/schemas/Meta' }
 
     HealthResponse:
       type: object
+      required: [success, data]
       properties:
-        success: { type: boolean, example: true }
+        success: { type: boolean, enum: [true], example: true }
         data:
           type: object
+          required: [status, service, version, startedAt, uptimeSec]
           properties:
             status: { type: string, example: ok }
             service: { type: string, example: vet-clinic-api }
@@ -821,6 +1051,7 @@ components:
             uptimeSec: { type: integer, example: 1234 }
             docs:
               type: string
+              format: uri
               nullable: true
               example: http://localhost:4000/docs
 
@@ -828,7 +1059,7 @@ components:
       type: object
       required: [id, email]
       properties:
-        id: { type: string, example: clu1xv8z00000abcd1234efgh }
+        id: { type: string, example: clusr0001 }
         email: { type: string, format: email, example: vet@example.com }
         name: { type: string, nullable: true, example: Akmal }
 
@@ -839,32 +1070,27 @@ components:
         user: { $ref: '#/components/schemas/PublicUser' }
         accessToken:
           type: string
-          example: eyJhbGciOi...
+          description: HS256 JWT, sukut bo'yicha 15 daqiqa amal qiladi.
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
         refreshToken:
           type: string
-          description: 96-belgili hex string (server tomonida SHA-256 hash bilan saqlanadi)
-          example: 3b2f5c...d9e1
+          minLength: 96
+          maxLength: 96
+          description: 96 belgi hex string. Server tomonida SHA-256 hash bilan saqlanadi.
+          example: 3b2f5c7e9a8b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d
 
     AuthTokensEnvelope:
       type: object
+      required: [success, data]
       properties:
-        success: { type: boolean, example: true }
+        success: { type: boolean, enum: [true], example: true }
         data: { $ref: '#/components/schemas/AuthPayload' }
-      example:
-        success: true
-        data:
-          user:
-            id: clu1xv8z00000abcd1234efgh
-            email: vet@example.com
-            name: Akmal
-          accessToken: eyJhbGciOi...
-          refreshToken: 3b2f5c...d9e1
 
     RegisterRequest:
       type: object
       required: [email, password]
       properties:
-        email: { type: string, format: email, example: vet@example.com }
+        email: { type: string, format: email, maxLength: 254, example: vet@example.com }
         password: { type: string, minLength: 8, maxLength: 128, example: StrongP@ss1 }
         name: { type: string, minLength: 1, maxLength: 120, example: Akmal }
 
@@ -872,40 +1098,50 @@ components:
       type: object
       required: [email, password]
       properties:
-        email: { type: string, format: email, example: vet@example.com }
+        email: { type: string, format: email, maxLength: 254, example: vet@example.com }
         password: { type: string, minLength: 1, maxLength: 128, example: StrongP@ss1 }
 
     RefreshRequest:
       type: object
       required: [refreshToken]
       properties:
-        refreshToken: { type: string, minLength: 20 }
+        refreshToken: { type: string, minLength: 20, maxLength: 256 }
 
     LogoutRequest:
       type: object
       properties:
-        refreshToken: { type: string, minLength: 20 }
+        refreshToken: { type: string, minLength: 20, maxLength: 256 }
 
     OkEnvelope:
       type: object
+      required: [success, data]
       properties:
-        success: { type: boolean, example: true }
+        success: { type: boolean, enum: [true], example: true }
         data:
           type: object
+          required: [ok]
           properties:
-            ok: { type: boolean, example: true }
+            ok: { type: boolean, enum: [true], example: true }
 
     OpeningSlot:
       type: object
       nullable: true
-      description: 24-soat formatdagi ish vaqti yoki `null` (yopiq)
+      description: 24-soat formatdagi ish vaqti yoki `null` (yopiq kun).
+      required: [open, close]
       properties:
-        open: { type: string, example: '09:00' }
-        close: { type: string, example: '19:00' }
+        open:
+          type: string
+          pattern: '^([01]\d|2[0-3]):[0-5]\d$'
+          example: '09:00'
+        close:
+          type: string
+          pattern: '^([01]\d|2[0-3]):[0-5]\d$'
+          example: '19:00'
 
     OpeningHours:
       type: object
-      description: Hafta kunlari bo‘yicha ish vaqti (`null` — yopiq kun)
+      description: Hafta kunlari bo'yicha ish vaqti (`null` — yopiq kun). Hamma 7 kun majburiy.
+      required: [mon, tue, wed, thu, fri, sat, sun]
       properties:
         mon: { $ref: '#/components/schemas/OpeningSlot' }
         tue: { $ref: '#/components/schemas/OpeningSlot' }
@@ -918,7 +1154,7 @@ components:
     ClinicSummary:
       type: object
       properties:
-        id: { type: string }
+        id: { type: string, example: clu1xv8z00000abcd1234efgh }
         name: { type: string, example: Vet Service Chilonzor }
         phone: { type: string, example: '+998 71 123 45 67' }
         address: { type: string, example: Chilonzor-9, Toshkent }
@@ -932,41 +1168,27 @@ components:
           type: number
           format: double
           nullable: true
+          minimum: 1
+          maximum: 5
           example: 4.6
-        reviewCount: { type: integer, example: 12 }
+        reviewCount: { type: integer, minimum: 0, example: 12 }
 
     ClinicsNearbyEnvelope:
       type: object
+      required: [success, data]
       properties:
-        success: { type: boolean, example: true }
+        success: { type: boolean, enum: [true], example: true }
         data:
           type: object
+          required: [clinics]
           properties:
             clinics:
               type: array
               items: { $ref: '#/components/schemas/ClinicSummary' }
-      example:
-        success: true
-        data:
-          clinics:
-            - id: clu1xv8z00000abcd1234efgh
-              name: Vet Service Chilonzor
-              phone: "+998 71 123 45 67"
-              address: Chilonzor-9, Toshkent
-              city: Toshkent
-              latitude: 41.285
-              longitude: 69.204
-              distanceKm: 1.27
-              isOpenNow: true
-              todayHours:
-                open: "09:00"
-                close: "19:00"
-              averageRating: 4.6
-              reviewCount: 12
 
     ClinicDetail:
       type: object
-      description: Klinika to‘liq ma’lumoti (masofasiz)
+      description: Klinika to'liq ma'lumoti (masofasiz).
       properties:
         id: { type: string }
         name: { type: string }
@@ -982,15 +1204,19 @@ components:
           type: number
           format: double
           nullable: true
-        reviewCount: { type: integer }
+          minimum: 1
+          maximum: 5
+        reviewCount: { type: integer, minimum: 0 }
         reviews:
           type: array
+          maxItems: 50
           items: { $ref: '#/components/schemas/ReviewPublic' }
 
     ClinicDetailEnvelope:
       type: object
+      required: [success, data]
       properties:
-        success: { type: boolean, example: true }
+        success: { type: boolean, enum: [true], example: true }
         data: { $ref: '#/components/schemas/ClinicDetail' }
 
     ReviewPublic:
@@ -998,7 +1224,7 @@ components:
       properties:
         id: { type: string }
         rating: { type: integer, minimum: 1, maximum: 5, example: 5 }
-        comment: { type: string, nullable: true, example: Juda yaxshi xizmat }
+        comment: { type: string, nullable: true, maxLength: 2000, example: Juda yaxshi xizmat }
         createdAt: { type: string, format: date-time }
         user:
           type: object
@@ -1007,7 +1233,7 @@ components:
             name: { type: string, nullable: true }
             email:
               type: string
-              description: Maskalangan email (masalan, `va***@example.com`)
+              description: Maskalangan email (masalan, `va***@example.com`).
               example: va***@example.com
 
     ReviewCreateRequest:
@@ -1019,17 +1245,19 @@ components:
 
     ReviewEnvelope:
       type: object
+      required: [success, data]
       properties:
-        success: { type: boolean, example: true }
+        success: { type: boolean, enum: [true], example: true }
         data: { $ref: '#/components/schemas/ReviewPublic' }
 
     # ───────── ADMIN SCHEMAS ─────────
     Pagination:
       type: object
+      required: [total, page, pageSize]
       properties:
-        total: { type: integer, example: 42 }
-        page: { type: integer, example: 1 }
-        pageSize: { type: integer, example: 20 }
+        total: { type: integer, minimum: 0, example: 42 }
+        page: { type: integer, minimum: 1, example: 1 }
+        pageSize: { type: integer, minimum: 1, maximum: 100, example: 20 }
 
     AdminClinic:
       type: object
@@ -1042,24 +1270,27 @@ components:
         latitude: { type: number, format: double }
         longitude: { type: number, format: double }
         openingHours: { $ref: '#/components/schemas/OpeningHours' }
-        reviewCount: { type: integer }
+        reviewCount: { type: integer, minimum: 0 }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
 
     AdminClinicEnvelope:
       type: object
+      required: [success, data]
       properties:
-        success: { type: boolean, example: true }
+        success: { type: boolean, enum: [true], example: true }
         data: { $ref: '#/components/schemas/AdminClinic' }
 
     AdminClinicsListEnvelope:
       type: object
+      required: [success, data]
       properties:
-        success: { type: boolean, example: true }
+        success: { type: boolean, enum: [true], example: true }
         data:
           allOf:
             - $ref: '#/components/schemas/Pagination'
             - type: object
+              required: [items]
               properties:
                 items:
                   type: array
@@ -1069,16 +1300,20 @@ components:
       type: object
       required: [name, phone, address, city, latitude, longitude, openingHours]
       properties:
-        name: { type: string, minLength: 2, maxLength: 160 }
-        phone: { type: string, minLength: 5, maxLength: 40 }
-        address: { type: string, minLength: 2, maxLength: 255 }
-        city: { type: string, minLength: 2, maxLength: 80 }
-        latitude: { type: number, format: double, minimum: -90, maximum: 90 }
-        longitude: { type: number, format: double, minimum: -180, maximum: 180 }
+        name: { type: string, minLength: 2, maxLength: 160, example: Vet Service Chilonzor }
+        phone: { type: string, minLength: 5, maxLength: 40, example: '+998 71 123 45 67' }
+        address: { type: string, minLength: 2, maxLength: 255, example: Chilonzor-9 }
+        city: { type: string, minLength: 2, maxLength: 80, example: Toshkent }
+        latitude: { type: number, format: double, minimum: -90, maximum: 90, example: 41.285 }
+        longitude: { type: number, format: double, minimum: -180, maximum: 180, example: 69.204 }
         openingHours: { $ref: '#/components/schemas/OpeningHours' }
 
     AdminClinicUpdateRequest:
       type: object
+      description: |
+        Faqat o'zgartirmoqchi bo'lgan maydonlarni yuboring (hammasi ixtiyoriy).
+        Bo'sh body taqiqlanadi — kamida bitta maydon kerak.
+      minProperties: 1
       properties:
         name: { type: string, minLength: 2, maxLength: 160 }
         phone: { type: string, minLength: 5, maxLength: 40 }
@@ -1087,12 +1322,6 @@ components:
         latitude: { type: number, format: double, minimum: -90, maximum: 90 }
         longitude: { type: number, format: double, minimum: -180, maximum: 180 }
         openingHours: { $ref: '#/components/schemas/OpeningHours' }
-
-    AdminUserRoleUpdateRequest:
-      type: object
-      required: [role]
-      properties:
-        role: { type: string, enum: [USER, ADMIN] }
 
     AdminUser:
       type: object
@@ -1101,34 +1330,49 @@ components:
         email: { type: string, format: email }
         name: { type: string, nullable: true }
         role: { type: string, enum: [USER, ADMIN] }
-        reviewCount: { type: integer }
+        reviewCount: { type: integer, minimum: 0 }
         createdAt: { type: string, format: date-time }
 
     AdminUserEnvelope:
       type: object
+      required: [success, data]
       properties:
-        success: { type: boolean, example: true }
+        success: { type: boolean, enum: [true], example: true }
         data: { $ref: '#/components/schemas/AdminUser' }
 
     AdminUsersListEnvelope:
       type: object
+      required: [success, data]
       properties:
-        success: { type: boolean, example: true }
+        success: { type: boolean, enum: [true], example: true }
         data:
           allOf:
             - $ref: '#/components/schemas/Pagination'
             - type: object
+              required: [items]
               properties:
                 items:
                   type: array
                   items: { $ref: '#/components/schemas/AdminUser' }
+
+    AdminUserRoleUpdateRequest:
+      type: object
+      required: [role]
+      properties:
+        role:
+          type: string
+          enum: [USER, ADMIN]
+          description: |
+            Yangi rol. `USER` <-> `ADMIN` o'zaro almashtirish.
+            O'zingizdan `ADMIN`ni olib tashlay olmaysiz (`CANNOT_DEMOTE_SELF`).
+          example: ADMIN
 
     AdminReview:
       type: object
       properties:
         id: { type: string }
         rating: { type: integer, minimum: 1, maximum: 5 }
-        comment: { type: string, nullable: true }
+        comment: { type: string, nullable: true, maxLength: 2000 }
         createdAt: { type: string, format: date-time }
         clinic:
           type: object
@@ -1146,12 +1390,14 @@ components:
 
     AdminReviewsListEnvelope:
       type: object
+      required: [success, data]
       properties:
-        success: { type: boolean, example: true }
+        success: { type: boolean, enum: [true], example: true }
         data:
           allOf:
             - $ref: '#/components/schemas/Pagination'
             - type: object
+              required: [items]
               properties:
                 items:
                   type: array
@@ -1159,17 +1405,21 @@ components:
 
     AdminDashboardEnvelope:
       type: object
+      required: [success, data]
       properties:
-        success: { type: boolean, example: true }
+        success: { type: boolean, enum: [true], example: true }
         data:
           type: object
+          required: [counts, latestReviews]
           properties:
             counts:
               type: object
+              required: [users, clinics, reviews]
               properties:
-                users: { type: integer }
-                clinics: { type: integer }
-                reviews: { type: integer }
+                users: { type: integer, minimum: 0 }
+                clinics: { type: integer, minimum: 0 }
+                reviews: { type: integer, minimum: 0 }
             latestReviews:
               type: array
+              maxItems: 5
               items: { $ref: '#/components/schemas/AdminReview' }
