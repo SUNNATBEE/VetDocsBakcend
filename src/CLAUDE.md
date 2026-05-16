@@ -25,12 +25,12 @@ Signals:
 4. `helmet({ contentSecurityPolicy: false, crossOriginResourcePolicy: 'cross-origin' })` — CSP off because the admin SPA inlines scripts.
 5. `compression()`.
 6. `express.json({ limit: '1mb' })` — JSON parse errors are caught by the error handler (`entity.parse.failed`, `entity.too.large`).
-7. **Static admin UI at `/admin`** (mounted before the global limiter so static assets aren't rate-limited).
+7. **Static admin UI at `/admin`** + **public map page at `/map`** (both mounted before the global limiter so static assets aren't rate-limited). `/map` is the user-facing Google-Maps "5 km nearby" page; it consumes `/api/v1/clinics/nearby`, `/clinics/districts`, and `/config/public`.
 8. `req.env = env` injection — services read tunables from `req.env`.
 9. `globalLimiter(env)` — skips `/`, `/favicon.ico`, `/docs/*`.
 10. `setupSwagger(app, env)` — mounts `/docs` (basic-auth gated) and `/docs/openapi.yaml`.
 11. `GET /` — service banner with API + docs URLs.
-12. `app.use(env.apiPrefix, createV1Router(env))` — `/api/v1/*`.
+12. `app.use(env.apiPrefix, createV1Router(env))` — `/api/v1/*`. Includes the small `GET /config/public` route that hands the Google Maps browser key to the `/map` SPA (returns `null` when `GOOGLE_MAPS_BROWSER_KEY` is unset).
 13. `notFoundHandler` then `errorHandler` (must be last).
 
 If you add middleware, place it before the static mount only if it must apply to `/admin` assets too.

@@ -18,6 +18,10 @@ Bu bo'lim frontend jamoasi uchun yagona professional hujjatlar to'plami.
 3. [`FRONTEND_DELIVERY_PLAN.md`](./FRONTEND_DELIVERY_PLAN.md)
    - Sprintlar, team ownership, DoD, PR va release tartibi.
 
+## Changelog
+
+- [`CHANGELOG_2026-05-16_DISTRICTS_MAP.md`](./CHANGELOG_2026-05-16_DISTRICTS_MAP.md) — Toshkent tumanlari dropdown, `/clinics/districts`, `/config/public`, `/clinics/nearby` ga `district` filter, va `/map` reference sahifasi.
+
 ## Tez start
 
 1. Avval `FRONTEND_ARCHITECTURE.md`ni o'qing.

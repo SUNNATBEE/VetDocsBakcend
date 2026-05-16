@@ -6,18 +6,23 @@ The user-facing surface: nearby search, clinic detail, and authenticated review 
 
 | Method | Path | Auth | Notes |
 |---|---|---|---|
-| GET | `/clinics/nearby?lat&lng&radiusKm` | public | Default `radiusKm = 10`, max `200`. |
+| GET | `/clinics/nearby?lat&lng&radiusKm&address?&district?` | public | Default `radiusKm = 10`, max `200`. `district` (Toshkent tuman key) is optional; when present without `lat`/`lng` the search center falls back to the district center. |
+| GET | `/clinics/districts` | public | Catalog for the `/map` dropdown — returns `{ key, name, lat, lng, clinicCount }` per Toshkent tuman. Cached `public, max-age=300`. |
 | GET | `/clinics/:id` | public | Includes up to 50 most recent reviews. |
 | POST | `/clinics/:id/reviews` | bearer | Upsert (one review per user per clinic). |
 
-`/nearby` is mounted **before** `/:id` so the literal path matches first — don't reorder.
+`/nearby` and `/districts` are mounted **before** `/:id` so literal paths match first — don't reorder.
 
 ## `clinic.service.js`
 
-### `listNearby({ lat, lng, radiusKm })`
-- Loads **every** `Clinic` row with `reviews: { select: { rating: true } }`. Filtering and sorting happen in JS via `distanceKm`.
-- Returns lightweight DTOs: includes `distanceKm` (rounded to 0.01), `isOpenNow`, `todayHours`, `averageRating` (rounded to 0.1), `reviewCount`. Opening-hours JSON is **not** returned by this endpoint — clients use `todayHours` for the list view.
-- **Known scaling limit.** This will degrade past a few hundred clinics. The intended fix is a Postgres bbox prefilter (`latitude BETWEEN $minLat AND $maxLat AND longitude BETWEEN $minLon AND $maxLon`) computed from `radiusKm`, then haversine-refine the survivors. Don't ship that change without also indexing `(latitude, longitude)` — the index already exists in `prisma/schema.prisma`, so the query plan should be ready.
+### `listNearby({ lat, lng, radiusKm, district? })`
+- Computes a lat/lng bounding box from `radiusKm` and queries Prisma with `where: { latitude: {gte,lte}, longitude: {gte,lte}, district? }`. The `district` filter (when set) goes into the same `where` clause.
+- DTOs include `distanceKm` (rounded to 0.01), `isOpenNow`, `todayHours`, `averageRating` (rounded to 0.1), `reviewCount`, and now `district`. Opening-hours JSON is **not** returned by this endpoint — clients use `todayHours` for the list view.
+- **Known scaling limit.** Bbox is in the Prisma `where`, but the haversine refine + sort still runs in Node. After 2026-05-16 the seed holds ~60 rows; fine at this scale. Past a few hundred clinics, push the haversine into Postgres (`earthdistance` / raw SQL) and drop the JS pass.
+
+### `listDistricts()`
+- `prisma.clinic.groupBy({ by: ['district'], where: { district: { not: null } }, _count })` to compute per-tuman row count, then enriched with `name`/`lat`/`lng` from `clinic.constants.js::TASHKENT_DISTRICTS`.
+- Order is the constants-file order (alphabetical-ish) — the API returns a stable list even if some tumans currently have zero clinics.
 
 ### `getById(id)`
 - Returns full opening-hours JSON plus the latest 50 reviews (with `user.id/name/email` masked).
@@ -38,9 +43,14 @@ The user-facing surface: nearby search, clinic detail, and authenticated review 
 
 ```js
 nearbyQuerySchema:
-  lat       coerce.number, [-90, 90]
-  lng       coerce.number, [-180, 180]
+  lat       coerce.number, [-90, 90], optional
+  lng       coerce.number, [-180, 180], optional
+  address   trimmed string (3..500), optional — mutually exclusive with lat/lng
   radiusKm  coerce.number, (0, 200], default 10
+  district  enum(TASHKENT_DISTRICT_KEYS), optional
+  // superRefine: if address → lat/lng forbidden.
+  //              if district → lat/lng optional (defaults to district center).
+  //              else → lat & lng required.
 
 clinicIdParamsSchema:
   id        non-empty string
@@ -50,7 +60,7 @@ reviewBodySchema:
   comment   trimmed string ≤ 2000, optional
 ```
 
-`coerce.number()` is required because query params arrive as strings. The bounds match the lat/lon physical range exactly — don't loosen them.
+`coerce.number()` is required because query params arrive as strings. The bounds match the lat/lon physical range exactly — don't loosen them. `district` uses `z.enum(TASHKENT_DISTRICT_KEYS)` so unknown values are rejected at the boundary — the service trusts the input.
 
 ## What NOT to do
 

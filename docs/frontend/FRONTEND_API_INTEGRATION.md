@@ -41,8 +41,10 @@ Frontend qoidasi: componentlar raw `fetch` ishlatmaydi, faqat `api client` ishla
 ### Public
 
 - `GET /health`
-- `GET /clinics/nearby`
+- `GET /clinics/nearby` — `lat`/`lng`/`address`/`district` rejimlari; default `radiusKm=10`
+- `GET /clinics/districts` — Toshkent tumanlari katalogi (dropdown uchun)
 - `GET /clinics/:id`
+- `GET /config/public` — `googleMapsBrowserKey` (xarita SPA uchun)
 
 ### Auth
 
@@ -67,9 +69,11 @@ Frontend qoidasi: componentlar raw `fetch` ishlatmaydi, faqat `api client` ishla
 Tavsiya etilgan query-key naming:
 
 - `['health']`
-- `['clinics', 'nearby', { lat, lng, radiusKm }]`
+- `['clinics', 'nearby', { lat, lng, radiusKm, district }]`
+- `['clinics', 'districts']` — stable, kamdan-kam o'zgaradi (server `Cache-Control: public, max-age=300`)
 - `['clinics', 'detail', clinicId]`
 - `['reviews', 'clinic', clinicId]`
+- `['config', 'public']`
 - `['admin', 'dashboard']`
 - `['admin', 'clinics', { page, pageSize, q }]`
 - `['admin', 'users', { page, pageSize, q }]`
@@ -99,11 +103,23 @@ Tavsiya etilgan query-key naming:
 ## 8) Example service signatures (TS)
 
 ```ts
-getNearbyClinics(input: { lat: number; lng: number; radiusKm?: number }): Promise<{ clinics: ClinicSummary[] }>
+type NearbyInput =
+  | { lat: number; lng: number; radiusKm?: number; district?: District }
+  | { address: string; radiusKm?: number; district?: District }
+  | { district: District; radiusKm?: number };          // markaz tuman markazi
+
+getNearbyClinics(input: NearbyInput): Promise<{
+  clinics: ClinicSummary[];
+  searchCenter?: { lat: number; lng: number; query?: string; district?: District | null };
+}>
+listDistricts(): Promise<{ districts: Array<{ key: District; name: string; lat: number; lng: number; clinicCount: number }> }>
+getPublicConfig(): Promise<{ googleMapsBrowserKey: string | null }>
 getClinicDetail(id: string): Promise<ClinicDetail>
 createReview(input: { clinicId: string; rating: number; comment?: string }): Promise<Review>
 login(input: { email: string; password: string }): Promise<AuthPayload>
 ```
+
+> `District` — `'Bektemir' | 'Chilonzor' | 'Mirobod' | 'Mirzo Ulug‘bek' | 'Olmazor' | 'Sergeli' | 'Shayxontohur' | 'Uchtepa' | 'Yakkasaroy' | 'Yangi Hayot' | 'Yashnobod' | 'Yunusobod'`. Hech qachon hardcode qilmang — `/clinics/districts` dan dynamicallt yuklang (admin yangi tuman qo'shsa, frontend qayta deploy qilinmasin).
 
 ## 9) QA API checklist
 

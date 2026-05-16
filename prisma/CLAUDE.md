@@ -23,10 +23,13 @@ Pooled URL must include `?pgbouncer=true&connection_limit=1` per Prisma's PgBoun
 ```
 User           — id (cuid), email (unique), passwordHash, name?, role, timestamps
 RefreshToken   — tokenHash (unique), userId (FK cascade), expiresAt, revokedAt?, createdAt
-Clinic         — name, phone, address, city, lat/lng (Float), openingHours (Json), timestamps
+Clinic         — name, phone, address, city, district?, lat/lng (Float),
+                 openingHours (Json), timestamps
 Review         — clinicId (FK cascade), userId (FK cascade), rating (Int 1..5), comment?, timestamps
                  unique (clinicId, userId)
 ```
+
+`Clinic.district` is the canonical Toshkent tuman key (`Chilonzor`, `Yunusobod`, …). It's nullable so non-Toshkent rows stay `null`. The full enum lives in `src/modules/clinics/clinic.constants.js::TASHKENT_DISTRICTS` — keep DB values in sync with that list (it's the source of truth for both validation and the `/clinics/districts` dropdown).
 
 Cascade rules are deliberate:
 - `User → RefreshToken` cascade: deleting a user wipes their sessions immediately.
@@ -35,7 +38,7 @@ Cascade rules are deliberate:
 Indexes:
 - `User(role)` — admin-list filtering.
 - `RefreshToken(userId)`, `RefreshToken(expiresAt)` — token lookup + future cleanup queries.
-- `Clinic(city)`, `Clinic(latitude, longitude)` — list filters and the future bbox query.
+- `Clinic(city)`, `Clinic(district)`, `Clinic(latitude, longitude)` — list filters and the future bbox query.
 - `Review(clinicId)`, `Review(userId)` — join paths.
 
 Don't add `@@index` lightly — every index slows writes. If you're adding one, name the workload that uses it.
@@ -63,8 +66,11 @@ Migration files are immutable history. **Never edit a committed migration's SQL.
 
 Run via `npm run db:seed` or automatically by `prisma migrate reset`. Behavior:
 
-1. **Wipes** `Review` and `Clinic` rows (via `deleteMany`) and reinserts the 4 sample clinics. Users are not touched.
+1. **Wipes** `Review` and `Clinic` rows (via `deleteMany`) and reinserts the full fixture: **60 Toshkent clinics** (12 tumans × 5 named patterns from `clinicNamePatterns`) plus 2 other-city samples. Users are not touched.
+   - Tuman list and center coordinates live in the seed file and mirror `src/modules/clinics/clinic.constants.js`. If you add a tuman, edit both files.
+   - The 5 clinics per tuman are placed at small offsets around the center (~0.5–1 km apart) so the `/map` 5 km radius search returns multiple hits.
 2. Upserts a single admin keyed by `SEED_ADMIN_EMAIL`. If the user exists, only the `role` is updated to `ADMIN` — password and name are preserved. If the user does not exist, it's created with `bcrypt.hash(SEED_ADMIN_PASSWORD, 12)`.
+3. Upserts 5 demo USERs and attaches one review per demo user to two anchor clinics (`24/7 Emergency Vet — Chilonzor` and `PetCare Markazi — Yunusobod`), so the detail page has non-empty review lists out of the box.
 
 **Operational reminders:**
 

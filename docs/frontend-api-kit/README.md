@@ -28,8 +28,10 @@ Bu papka o'quvchilar uchun tayyor fetch qatlamini beradi. Maqsad: har kim endpoi
 
 ### Public
 - `GET /health`
-- `GET /clinics/nearby?lat&lng&radiusKm`
+- `GET /clinics/nearby?lat&lng&radiusKm` — yoki `?address=...&radiusKm=...` yoki `?district=Chilonzor&radiusKm=5`
+- `GET /clinics/districts` — Toshkent tumanlari dropdowni uchun
 - `GET /clinics/:id`
+- `GET /config/public` — xarita SPA Google Maps kalitini shu yerdan oladi
 
 ### Auth
 - `POST /auth/register`

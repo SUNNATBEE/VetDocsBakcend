@@ -1,7 +1,7 @@
 # Vet Clinic API — Project Guide
 
 > Express 5 + Prisma 6 + Postgres backend for an Uzbekistan vet-clinic catalog.
-> Stateless JWT auth with rotating refresh tokens, admin RBAC, and a vanilla-JS admin SPA at `/admin`.
+> Stateless JWT auth with rotating refresh tokens, admin RBAC, a vanilla-JS admin SPA at `/admin`, and a public Google-Maps-powered "find clinics within 5 km" page at `/map`.
 > User-facing strings, error messages, and API responses are written in **Uzbek** — preserve that when editing.
 
 ---
@@ -43,15 +43,18 @@ There is **no test runner configured**. When changes warrant verification, run a
 ```
 src/
   server.js              # bootstrap, signal handling, DB reconnect loop
-  app.js                 # createApp() — wires middleware + routes
+  app.js                 # createApp() — wires middleware + routes + /admin + /map static
   config/                # env loader, Swagger setup
-  routes/v1.router.js    # /api/v1 mount points
+  routes/v1.router.js    # /api/v1 mount points (incl. GET /config/public)
   modules/               # feature slices (auth, clinics, admin, health)
   common/                # cross-cutting middleware, errors, utils
   infrastructure/database/prisma.client.js
 prisma/                  # schema, migrations, seed   → see prisma/CLAUDE.md
 public/admin/            # vanilla-JS admin SPA       → see public/admin/CLAUDE.md
+public/map/              # public Google-Maps "5 km nearby" SPA (no toolchain)
 docs/openapi.yaml        # OpenAPI 3 spec served at /docs
+docs/frontend/           # frontend team docs (architecture + integration + changelog)
+docs/frontend-api-kit/   # copy-paste ESM fetch wrappers for student teams
 ```
 
 Each folder under `src/` and the two top-level data folders has its own `CLAUDE.md`. Read those when you touch the area — they encode invariants that aren't visible from the code alone.
@@ -92,8 +95,23 @@ Three correctness/observability fixes were applied — keep them in mind when re
 
 Open follow-ups (not yet acted on):
 
-- `src/modules/clinics/clinic.service.js::listNearby` loads every `Clinic` row and filters in JS. Acceptable for the current ~10-row scale; switch to a Postgres bbox prefilter (`latitude BETWEEN ?` etc.) before this table grows past a few hundred rows.
+- `src/modules/clinics/clinic.service.js::listNearby` loads every `Clinic` row inside the bbox and filters in JS. After the 2026-05-16 seed expansion the table holds ~60 rows; still fine, but the JS-side haversine filter remains the long-term scaling concern. The `(latitude, longitude)` index already exists — when row count grows past a few hundred, tighten the Prisma `where` to use the precomputed bbox + haversine refine in JS only.
 - No cron job for refresh-token cleanup (`expiresAt < now()` rows accumulate forever). Cheap to add via `pg_cron` or an external scheduler.
+
+---
+
+## 2026-05-16 — district + public map
+
+A user-facing feature was added on top of the existing nearby search:
+
+- **`Clinic.district String?`** column (Postgres index) — populated for Toshkent clinics, `null` for other cities. Migration: `prisma/migrations/20260516000000_add_clinic_district/`.
+- **Seed expanded** to 60 Toshkent clinics (12 tumans × 5) plus 2 other-city samples. The seed still wipes `Review`/`Clinic` — do not run against a populated production DB.
+- **`GET /clinics/nearby`** accepts an optional `district` query param. When `district` is provided without `lat`/`lng`, the controller falls back to the district's center coordinates from `clinic.constants.js`.
+- **`GET /clinics/districts`** — catalog endpoint (key, display name, center coords, clinic count) used to populate the dropdown on `/map`.
+- **`GET /config/public`** — exposes `googleMapsBrowserKey` (from env) so the `/map` SPA can lazy-load the Google Maps JS API. Returns `null` when the key is unset and the page falls back to list-only mode.
+- **`public/map/`** — vanilla-JS page, no build step. Geolocation button → `/clinics/nearby?lat&lng&radiusKm=5`. Districts dropdown → `/clinics/nearby?district=…&radiusKm=…`.
+- **`GOOGLE_MAPS_BROWSER_KEY`** added to `config/env.js` and `.env.example`. In Google Cloud Console restrict the key to **Maps JavaScript API** + HTTP referrer of your deployed origin.
+- **`railway.json`** `buildCommand` now runs `npx prisma generate && npx prisma migrate deploy` so schema changes apply automatically on every deploy.
 
 ---
 
