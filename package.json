@@ -18,7 +18,7 @@
     "db:reset": "prisma migrate reset",
     "db:seed": "node prisma/seed.js",
     "db:studio": "prisma studio",
-    "prepare": "husky",
+    "prepare": "husky || true",
     "check:js": "node --check src/server.js && node --check src/app.js",
     "lint": "eslint src tests prisma/seed.js",
     "format": "prettier --write \"src/**/*.js\" \"tests/**/*.js\"",
