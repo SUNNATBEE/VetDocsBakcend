@@ -105,6 +105,18 @@ function loadEnv() {
     rateLimitMax: int(process.env.RATE_LIMIT_MAX, 300),
     authRateLimitWindowMinutes: int(process.env.AUTH_RATE_LIMIT_WINDOW_MINUTES, 15),
     authRateLimitMax: int(process.env.AUTH_RATE_LIMIT_MAX, 40),
+    /** Nominatim siyosati: User-Agent da aloqa ma'lumoti bo'lishi kerak */
+    geocodeUserAgent: process.env.GEOCODE_USER_AGENT || '',
+    /** Matn manzil orqali geokod (GET /clinics/nearby?address=) — IP bo'yicha cheklov */
+    geocodeRateLimitWindowMinutes: int(process.env.GEOCODE_RATE_LIMIT_WINDOW_MINUTES, 15),
+    geocodeRateLimitMax: int(process.env.GEOCODE_RATE_LIMIT_MAX, 20),
+    /**
+     * true bo'lsa GET /health/ready Postgres ulanishini tekshiradi; muvaffaqiyatsiz bo'lsa 503.
+     * Productionda default true; lokalda READINESS_CHECK_DB=false qilish mumkin.
+     */
+    readinessCheckDb: bool(process.env.READINESS_CHECK_DB, isProduction),
+    /** Public /map sahifasi uchun Google Maps JS API browser key (HTTP referrer bilan cheklang). */
+    googleMapsBrowserKey: process.env.GOOGLE_MAPS_BROWSER_KEY || '',
   };
 }
 

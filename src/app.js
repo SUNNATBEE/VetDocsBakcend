@@ -9,6 +9,7 @@ const { setupSwagger } = require('./config/swagger');
 const { errorHandler } = require('./common/errors/errorHandler');
 const { requestIdMiddleware } = require('./common/middleware/requestId');
 const { httpLogger } = require('./common/middleware/httpLogger');
+const { metricsMiddleware } = require('./common/observability/metrics');
 const { globalLimiter } = require('./common/middleware/rateLimiter');
 const { notFoundHandler } = require('./common/middleware/notFound');
 const { createV1Router } = require('./routes/v1.router');
@@ -22,6 +23,7 @@ function createApp(envOverride) {
   app.locals.env = env;
 
   app.use(requestIdMiddleware);
+  app.use(metricsMiddleware);
   app.use(httpLogger(env));
 
   const corsOptions =
@@ -43,6 +45,10 @@ function createApp(envOverride) {
   // Admin web UI (statik) — /admin
   const adminUiDir = path.join(__dirname, '../public/admin');
   app.use('/admin', express.static(adminUiDir, { extensions: ['html'] }));
+
+  // Public xarita sahifasi (statik) — /map
+  const mapUiDir = path.join(__dirname, '../public/map');
+  app.use('/map', express.static(mapUiDir, { extensions: ['html'] }));
 
   app.use((req, _res, next) => {
     req.env = env;

@@ -1,5 +1,7 @@
 const express = require('express');
 const path = require('path');
+const { prisma } = require('../../infrastructure/database/prisma.client');
+const { getMetrics, register } = require('../../common/observability/metrics');
 
 function readPackageVersion() {
   try {
@@ -28,6 +30,64 @@ function createHealthRouter(env) {
         docs: env.enableSwagger ? `${env.apiPublicUrl}/docs` : null,
       },
     });
+  });
+
+  router.get('/ready', async (req, res) => {
+    if (!env.readinessCheckDb) {
+      return res.json({
+        success: true,
+        data: {
+          status: 'ready',
+          database: 'skipped',
+          timestamp: new Date().toISOString(),
+        },
+      });
+    }
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+      return res.json({
+        success: true,
+        data: {
+          status: 'ready',
+          database: 'connected',
+          timestamp: new Date().toISOString(),
+        },
+      });
+    } catch {
+      return res.status(503).json({
+        success: false,
+        error: {
+          code: 'SERVICE_UNAVAILABLE',
+          message: 'Postgres ulanishi tekshirilmadi',
+        },
+        meta: { requestId: req.requestId || null },
+      });
+    }
+  });
+
+  router.get('/db', async (_req, res, next) => {
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+      res.json({
+        success: true,
+        data: {
+          status: 'ok',
+          database: 'connected',
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.get('/metrics', async (_req, res, next) => {
+    try {
+      const metrics = await getMetrics();
+      res.set('Content-Type', register.contentType);
+      res.status(200).send(metrics);
+    } catch (error) {
+      next(error);
+    }
   });
 
   return router;

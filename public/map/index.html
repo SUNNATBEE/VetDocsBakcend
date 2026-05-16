@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Vet Clinic — Yaqin atrofdagi klinikalar</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand__logo">VC</div>
+      <div>
+        <h1>Vet Clinic</h1>
+        <p class="muted">Yaqin atrofdagi veterinariya klinikalari</p>
+      </div>
+    </div>
+  </header>
+
+  <main class="layout">
+    <aside class="panel">
+      <div class="controls">
+        <button id="findNearbyBtn" class="btn btn--primary btn--block" type="button">
+          📍 Mening joylashuvim bo‘yicha 5 km radius
+        </button>
+
+        <label class="field">
+          <span>Toshkent tumani</span>
+          <select id="districtSelect" class="input">
+            <option value="">— Tumanni tanlang —</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Radius (km)</span>
+          <input id="radiusInput" type="number" class="input" min="0.5" max="50" step="0.5" value="5" />
+        </label>
+
+        <p id="status" class="muted status"></p>
+      </div>
+
+      <div class="list">
+        <h2 class="list__title">Topilgan klinikalar (<span id="count">0</span>)</h2>
+        <ul id="clinicList" class="clinic-list"></ul>
+      </div>
+    </aside>
+
+    <section class="map-wrap">
+      <div id="map" class="map"></div>
+    </section>
+  </main>
+
+  <script src="./app.js" defer></script>
+</body>
+</html>

@@ -12,6 +12,17 @@ function createV1Router(env) {
   router.use('/clinics', createClinicRouter(env));
   router.use('/admin', createAdminRouter(env));
 
+  // Public client-config — /map sahifasi Google Maps brauzer kalitini bu yerdan oladi.
+  router.get('/config/public', (req, res) => {
+    res.setHeader('Cache-Control', 'public, max-age=60');
+    res.json({
+      success: true,
+      data: {
+        googleMapsBrowserKey: req.env.googleMapsBrowserKey || null,
+      },
+    });
+  });
+
   return router;
 }
 

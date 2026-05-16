@@ -1,0 +1,15 @@
+# Default owners
+* @SUNNATBEE
+
+# Frontend docs ownership
+/docs/frontend/ @SUNNATBEE
+/docs/frontend-api-kit/ @SUNNATBEE
+/FRONTEND_STRUCTURE.md @SUNNATBEE
+
+# Backend critical ownership
+/src/modules/auth/ @SUNNATBEE
+/src/modules/admin/ @SUNNATBEE
+/prisma/ @SUNNATBEE
+
+# CI and repo policy
+/.github/ @SUNNATBEE

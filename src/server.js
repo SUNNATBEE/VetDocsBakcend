@@ -39,15 +39,36 @@ async function bootstrap() {
   void connectDatabaseWithRetry();
 
   async function shutdown(signal) {
+    const logLine = JSON.stringify({
+      ts: new Date().toISOString(),
+      level: 'info',
+      message: 'server_shutdown_start',
+      service: 'vet-clinic-api',
+      signal,
+    });
     // eslint-disable-next-line no-console
-    console.log(`\n[api] ${signal} qabul qilindi, server yopilmoqda...`);
+    console.log(logLine);
     shuttingDown = true;
     if (reconnectTimer) clearTimeout(reconnectTimer);
     server.close(async () => {
       await disconnectPrisma();
+      // eslint-disable-next-line no-console
+      console.log(
+        JSON.stringify({
+          ts: new Date().toISOString(),
+          level: 'info',
+          message: 'server_shutdown_complete',
+          service: 'vet-clinic-api',
+        }),
+      );
       process.exit(0);
     });
-    setTimeout(() => process.exit(1), 10_000).unref();
+    setTimeout(() => {
+      if (typeof server.closeAllConnections === 'function') {
+        server.closeAllConnections();
+      }
+      process.exit(1);
+    }, 10_000).unref();
   }
 
   ['SIGINT', 'SIGTERM'].forEach((sig) => process.on(sig, () => shutdown(sig)));

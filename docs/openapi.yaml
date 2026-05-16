@@ -120,6 +120,67 @@ paths:
                       uptimeSec: 1234
                       docs: https://vetclinicbackend.up.railway.app/docs
 
+  /health/ready:
+    get:
+      tags: [Health]
+      summary: Tayyorlik (readiness)
+      description: |
+        `READINESS_CHECK_DB=true` (productionda default) bo'lsa Postgres `SELECT 1`
+        bilan tekshiriladi; muvaffaqiyatsiz bo'lsa **503**.
+
+        `READINESS_CHECK_DB=false` bo'lsa faqat jarayon tayyorligi qaytariladi (`database: skipped`).
+      operationId: healthReady
+      responses:
+        '200':
+          description: Tayyor.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthReadyEnvelope'
+        '503':
+          description: Postgres ulanmagan (faqat qat'iy readiness rejimida).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /config/public:
+    get:
+      tags: [Config]
+      summary: Brauzer uchun ochiq konfiguratsiya
+      description: |
+        Public xarita sahifasi (`/map`) Google Maps JS API kalitini shu yerdan oladi.
+        Kalit serverda `GOOGLE_MAPS_BROWSER_KEY` env orqali sozlanadi va Google Cloud
+        Console'da **HTTP referrer cheklovi** bilan himoyalanishi kerak (frontend domeningiz).
+
+        Kalit bo'lmasa `null` qaytadi — `/map` sahifasi fallback ko'rinishida ishlaydi.
+
+        ```bash
+        curl "$BASE_URL/config/public"
+        ```
+      operationId: configPublic
+      responses:
+        '200':
+          description: Ochiq konfiguratsiya.
+          headers:
+            Cache-Control:
+              schema: { type: string, example: 'public, max-age=60' }
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicConfigEnvelope'
+              examples:
+                withKey:
+                  value:
+                    success: true
+                    data:
+                      googleMapsBrowserKey: AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+                noKey:
+                  value:
+                    success: true
+                    data:
+                      googleMapsBrowserKey: null
+
   /auth/register:
     post:
       tags: [Auth]
@@ -295,19 +356,33 @@ paths:
       tags: [Clinics]
       summary: Radius bo'yicha yaqin klinikalar
       description: |
-        Berilgan koordinata (`lat`, `lng`) atrofidagi klinikalarni masofa bo'yicha
-        o'sish tartibida qaytaradi. Har bir element uchun `distanceKm`, `isOpenNow`,
-        `todayHours`, `averageRating`, `reviewCount` qaytadi.
+        **Koordinata rejimi:** `lat` va `lng` atrofidagi klinikalarni masofa bo'yicha
+        tartiblab qaytaradi.
+
+        **Manzil rejimi:** faqat `address` (kamida 3 belgi) yuboring — server manzilni
+        geokodlab, shu nuqta atrofida qidiradi. Javobda `searchCenter` (xarita markazi)
+        keladi. `lat`/`lng` bilan `address` bir vaqtda yuborilmasligi kerak.
+
+        **Tuman rejimi:** `district` (Toshkent tumani) parametri berilsa va
+        `lat`/`lng` yuborilmasa — qidiruv markazi tuman markaziga o'rnatiladi.
+        Tuman ro'yxati uchun `GET /clinics/districts`. `district` bilan birga
+        `lat`/`lng` yoki `address` qo'llanilishi mumkin — bu holda natija
+        faqat shu tumandagi klinikalarga cheklanadi.
+
+        Geokodlash: OpenStreetMap Nominatim (serverda `GEOCODE_USER_AGENT` tavsiya etiladi).
+        Manzil rejimida **geokod rate limit** (`GEOCODE_RATE_LIMIT_*`) qo'llanadi.
 
         ```bash
         curl "$BASE_URL/clinics/nearby?lat=41.31&lng=69.25&radiusKm=5"
+        curl "$BASE_URL/clinics/nearby?address=Toshkent%20Chilonzor&radiusKm=50"
+        curl "$BASE_URL/clinics/nearby?district=Chilonzor&radiusKm=5"
         ```
       operationId: clinicsNearby
       parameters:
         - in: query
           name: lat
-          required: true
-          description: Kenglik (-90..90)
+          required: false
+          description: Kenglik (-90..90). `address` ishlatilmasa `lng` bilan majburiy.
           schema:
             type: number
             format: double
@@ -316,14 +391,22 @@ paths:
           example: 41.31
         - in: query
           name: lng
-          required: true
-          description: Uzunlik (-180..180)
+          required: false
+          description: Uzunlik (-180..180). `address` ishlatilmasa `lat` bilan majburiy.
           schema:
             type: number
             format: double
             minimum: -180
             maximum: 180
           example: 69.25
+        - in: query
+          name: address
+          required: false
+          description: Matn manzil (kamida 3 belgi). Ko'rsatilsa `lat`/`lng` yuborilmaydi.
+          schema:
+            type: string
+            maxLength: 500
+          example: Toshkent Chilonzor
         - in: query
           name: radiusKm
           required: false
@@ -335,6 +418,28 @@ paths:
             minimum: 0.01
             maximum: 200
           example: 5
+        - in: query
+          name: district
+          required: false
+          description: |
+            Toshkent tumani kaliti. To'liq ro'yxat: `GET /clinics/districts`.
+            Berilsa va `lat`/`lng` yuborilmasa — markaz tuman markazidan olinadi.
+          schema:
+            type: string
+            enum:
+              - Bektemir
+              - Chilonzor
+              - Mirobod
+              - Mirzo Ulug‘bek
+              - Olmazor
+              - Sergeli
+              - Shayxontohur
+              - Uchtepa
+              - Yakkasaroy
+              - Yangi Hayot
+              - Yashnobod
+              - Yunusobod
+          example: Chilonzor
       responses:
         '200':
           description: Klinikalar (masofa bo'yicha o'sib boruvchi).
@@ -361,8 +466,98 @@ paths:
                           todayHours: { open: '09:00', close: '19:00' }
                           averageRating: 4.6
                           reviewCount: 12
+                        - id: clu1xv8z00001abcd1234efgh
+                          name: Zoo Vet Klinikasi Yunusobod
+                          phone: '+998 71 234 56 78'
+                          address: Amir Temur ko‘chasi yaqin, Yunusobod
+                          city: Toshkent
+                          latitude: 41.365
+                          longitude: 69.292
+                          distanceKm: 3.45
+                          isOpenNow: true
+                          todayHours: { open: '09:00', close: '19:00' }
+                          averageRating: 4.4
+                          reviewCount: 9
+                        - id: clu1xv8z00002abcd1234efgh
+                          name: 24/7 Emergency Vet
+                          phone: '+998 90 555 12 34'
+                          address: Shayxontohur tumani, Toshkent
+                          city: Toshkent
+                          latitude: 41.315
+                          longitude: 69.248
+                          distanceKm: 1.06
+                          isOpenNow: true
+                          todayHours: { open: '00:00', close: '23:59' }
+                          averageRating: 4.8
+                          reviewCount: 21
+                        - id: clu1xv8z00003abcd1234efgh
+                          name: Samarqand Vet Markazi
+                          phone: '+998 66 222 33 44'
+                          address: Registon yo‘nalishi, Samarqand
+                          city: Samarqand
+                          latitude: 39.6542
+                          longitude: 66.9597
+                          distanceKm: 179.2
+                          isOpenNow: false
+                          todayHours: { open: '09:00', close: '19:00' }
+                          averageRating: 4.5
+                          reviewCount: 7
+                        - id: clu1xv8z00004abcd1234efgh
+                          name: Fargona Pet Care Center
+                          phone: '+998 73 244 77 88'
+                          address: Al-Farg'oniy ko'chasi, Farg'ona
+                          city: Farg'ona
+                          latitude: 40.3894
+                          longitude: 71.7875
+                          distanceKm: 232.7
+                          isOpenNow: false
+                          todayHours: { open: '08:30', close: '18:30' }
+                          averageRating: 4.3
+                          reviewCount: 5
         '400': { $ref: '#/components/responses/BadRequest' }
+        '404':
+          description: Manzil rejimida geokod topilmasa (`ADDRESS_NOT_FOUND`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /clinics/districts:
+    get:
+      tags: [Clinics]
+      summary: Toshkent tumanlari katalogi (dropdown uchun)
+      description: |
+        Public xarita sahifasidagi tuman dropdownini to'ldirish uchun.
+        Har bir tuman uchun kanonik `key`, ko'rsatiladigan `name`,
+        tuman markazi koordinatalari (`lat`/`lng`) va shu tumandagi
+        klinikalar soni qaytadi.
+
+        Javob 5 daqiqaga keshlanadi (`Cache-Control: public, max-age=300`).
+
+        ```bash
+        curl "$BASE_URL/clinics/districts"
+        ```
+      operationId: clinicsDistricts
+      responses:
+        '200':
+          description: Tumanlar ro'yxati.
+          headers:
+            Cache-Control:
+              schema: { type: string, example: 'public, max-age=300' }
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DistrictsEnvelope'
+              examples:
+                ok:
+                  summary: Toshkent tumanlari
+                  value:
+                    success: true
+                    data:
+                      districts:
+                        - { key: Chilonzor, name: Chilonzor, lat: 41.275, lng: 69.205, clinicCount: 5 }
+                        - { key: Yunusobod, name: Yunusobod, lat: 41.367, lng: 69.291, clinicCount: 5 }
 
   /clinics/{id}:
     get:
@@ -373,6 +568,9 @@ paths:
         50 sharh) qaytaradi. Sharhlardagi `user.email` xavfsizlik uchun maskalanadi
         (masalan, `va***@example.com`).
 
+        **HTTP cache:** javobda `ETag` (zaif) va `Cache-Control: private, no-cache` beriladi.
+        `If-None-Match` bilan oldingi `ETag` yuborilsa va o'zgarish bo'lmasa **304** qaytadi.
+
         ```bash
         curl "$BASE_URL/clinics/CLINIC_ID"
         ```
@@ -382,10 +580,64 @@ paths:
       responses:
         '200':
           description: Klinika va sharhlar (oxirgi 50 ta).
+          headers:
+            ETag:
+              description: Zaif ETag — `updatedAt` bilan bog'langan.
+              schema: { type: string }
+            Cache-Control:
+              schema: { type: string, example: 'private, no-cache' }
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ClinicDetailEnvelope'
+              examples:
+                vetServiceDetail:
+                  summary: Vet Service Chilonzor detali
+                  value:
+                    success: true
+                    data:
+                      id: clu1xv8z00000abcd1234efgh
+                      name: Vet Service Chilonzor
+                      phone: '+998 71 123 45 67'
+                      address: Chilonzor-9, Toshkent
+                      city: Toshkent
+                      latitude: 41.285
+                      longitude: 69.204
+                      updatedAt: '2026-05-06T10:00:00.000Z'
+                      openingHours:
+                        mon: { open: '09:00', close: '19:00' }
+                        tue: { open: '09:00', close: '19:00' }
+                        wed: { open: '09:00', close: '19:00' }
+                        thu: { open: '09:00', close: '19:00' }
+                        fri: { open: '09:00', close: '19:00' }
+                        sat: { open: '10:00', close: '16:00' }
+                        sun: null
+                      todayHours: { open: '09:00', close: '19:00' }
+                      isOpenNow: true
+                      averageRating: 4.5
+                      reviewCount: 2
+                      reviews:
+                        - id: clrev000100001
+                          rating: 5
+                          comment: Veterinarlar juda e'tiborli, xizmat zo'r.
+                          createdAt: '2026-05-06T11:20:00.000Z'
+                          user:
+                            id: clusr000100001
+                            name: Ali Karimov
+                            email: al***@vetclinic.uz
+                        - id: clrev000100002
+                          rating: 4
+                          comment: Navbat biroz bo'ldi, lekin davolash yaxshi.
+                          createdAt: '2026-05-05T15:10:00.000Z'
+                          user:
+                            id: clusr000100002
+                            name: Dilnoza Raximova
+                            email: di***@vetclinic.uz
+        '304':
+          description: If-None-Match joriy ETag bilan mos — tana bo'sh.
+          headers:
+            ETag:
+              schema: { type: string }
         '404': { $ref: '#/components/responses/NotFound' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
 
@@ -1055,6 +1307,22 @@ components:
               nullable: true
               example: http://localhost:4000/docs
 
+    HealthReadyEnvelope:
+      type: object
+      required: [success, data]
+      properties:
+        success: { type: boolean, enum: [true], example: true }
+        data:
+          type: object
+          required: [status, timestamp]
+          properties:
+            status: { type: string, example: ready }
+            database:
+              type: string
+              enum: [connected, skipped]
+              description: skipped = READINESS_CHECK_DB=false
+            timestamp: { type: string, format: date-time }
+
     PublicUser:
       type: object
       required: [id, email]
@@ -1159,6 +1427,11 @@ components:
         phone: { type: string, example: '+998 71 123 45 67' }
         address: { type: string, example: Chilonzor-9, Toshkent }
         city: { type: string, example: Toshkent }
+        district:
+          type: string
+          nullable: true
+          description: Toshkent klinikalari uchun tuman kaliti; boshqa shaharlarda `null`.
+          example: Chilonzor
         latitude: { type: number, format: double, example: 41.285 }
         longitude: { type: number, format: double, example: 69.204 }
         distanceKm: { type: number, format: double, example: 1.27 }
@@ -1185,6 +1458,60 @@ components:
             clinics:
               type: array
               items: { $ref: '#/components/schemas/ClinicSummary' }
+            searchCenter:
+              type: object
+              description: |
+                Xarita markazi. `address` rejimida `lat`/`lng` + `query` keladi.
+                `district` rejimida `lat`/`lng` (tuman markazi) + `district` keladi.
+                Faqat `lat`/`lng` rejimida ham qaytarilishi mumkin.
+              properties:
+                lat: { type: number, format: double }
+                lng: { type: number, format: double }
+                query: { type: string, nullable: true }
+                district: { type: string, nullable: true, example: Chilonzor }
+
+    District:
+      type: object
+      required: [key, name, lat, lng, clinicCount]
+      properties:
+        key:
+          type: string
+          description: Kanonik tuman kaliti (DB'da saqlanadi, query parametr sifatida yuboriladi).
+          example: Chilonzor
+        name:
+          type: string
+          description: UI'da ko'rsatiladigan nom (`Mirzo Ulug‘bek` kabi diakritikalar bilan).
+          example: Chilonzor
+        lat: { type: number, format: double, example: 41.275 }
+        lng: { type: number, format: double, example: 69.205 }
+        clinicCount: { type: integer, minimum: 0, example: 5 }
+
+    DistrictsEnvelope:
+      type: object
+      required: [success, data]
+      properties:
+        success: { type: boolean, enum: [true], example: true }
+        data:
+          type: object
+          required: [districts]
+          properties:
+            districts:
+              type: array
+              items: { $ref: '#/components/schemas/District' }
+
+    PublicConfigEnvelope:
+      type: object
+      required: [success, data]
+      properties:
+        success: { type: boolean, enum: [true], example: true }
+        data:
+          type: object
+          required: [googleMapsBrowserKey]
+          properties:
+            googleMapsBrowserKey:
+              type: string
+              nullable: true
+              description: Google Maps JS API browser key, sozlanmagan bo'lsa `null`.
 
     ClinicDetail:
       type: object
@@ -1195,8 +1522,17 @@ components:
         phone: { type: string }
         address: { type: string }
         city: { type: string }
+        district:
+          type: string
+          nullable: true
+          description: Toshkent klinikalari uchun tuman kaliti; boshqa shaharlarda `null`.
+          example: Chilonzor
         latitude: { type: number, format: double }
         longitude: { type: number, format: double }
+        updatedAt:
+          type: string
+          format: date-time
+          description: Oxirgi yangilanish (ETag bilan bog'langan).
         openingHours: { $ref: '#/components/schemas/OpeningHours' }
         todayHours: { $ref: '#/components/schemas/OpeningSlot' }
         isOpenNow: { type: boolean }
@@ -1267,6 +1603,7 @@ components:
         phone: { type: string }
         address: { type: string }
         city: { type: string }
+        district: { type: string, nullable: true, example: Chilonzor }
         latitude: { type: number, format: double }
         longitude: { type: number, format: double }
         openingHours: { $ref: '#/components/schemas/OpeningHours' }

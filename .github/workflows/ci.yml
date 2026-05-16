@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: ESLint
+        run: npm run lint
+
+      - name: JavaScript syntax check
+        run: npm run check:js
+
+      - name: Prisma format check
+        run: npx prisma format --check
+
+      - name: OpenAPI TypeScript codegen (YAML validatsiyasi)
+        run: npm run codegen:openapi
+
+      - name: Run tests
+        env:
+          JWT_ACCESS_SECRET: test-secret-key-with-at-least-32-characters
+          DATABASE_URL: postgresql://test:test@localhost:5432/test
+        run: npm test

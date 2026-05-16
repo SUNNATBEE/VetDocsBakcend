@@ -40,4 +40,22 @@ function authLimiter(env) {
   });
 }
 
-module.exports = { globalLimiter, authLimiter };
+/** Faqat `?address=` bilan kelgan yaqin qidiruv (tashqi geokod) */
+function geocodeNearbyLimiter(env) {
+  return rateLimit({
+    windowMs: env.geocodeRateLimitWindowMinutes * 60 * 1000,
+    max: env.geocodeRateLimitMax,
+    standardHeaders: true,
+    legacyHeaders: false,
+    skip: (req) => {
+      const q = req.query?.address;
+      return typeof q !== 'string' || q.trim().length < 3;
+    },
+    handler: buildLimitResponse(
+      'GEOCODE_RATE_LIMIT',
+      'Manzil qidiruvlari juda ko‘p. Bir ozdan keyin urinib ko‘ring.',
+    ),
+  });
+}
+
+module.exports = { globalLimiter, authLimiter, geocodeNearbyLimiter };

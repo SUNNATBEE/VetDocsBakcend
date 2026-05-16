@@ -2,8 +2,10 @@ const { prisma } = require('../../infrastructure/database/prisma.client');
 const { createHttpError } = require('../../common/errors/httpError');
 const { distanceKm } = require('../../common/utils/haversine');
 const { isOpenNow } = require('../../common/utils/openingHours');
+const { TASHKENT_DISTRICTS } = require('./clinic.constants');
 
 const REVIEW_LIST_LIMIT = 50;
+const EARTH_RADIUS_KM = 6371;
 
 function maskEmail(email) {
   if (!email || typeof email !== 'string') return '***';
@@ -33,8 +35,24 @@ function averageRating(ratings) {
   return Math.round((sum / ratings.length) * 10) / 10;
 }
 
-async function listNearby({ lat, lng, radiusKm }) {
+async function listNearby({ lat, lng, radiusKm, district }) {
+  const latDelta = (radiusKm / EARTH_RADIUS_KM) * (180 / Math.PI);
+  const safeCosLat = Math.max(Math.cos((lat * Math.PI) / 180), 0.01);
+  const lngDelta = latDelta / safeCosLat;
+
+  const minLat = Math.max(-90, lat - latDelta);
+  const maxLat = Math.min(90, lat + latDelta);
+  const minLng = Math.max(-180, lng - lngDelta);
+  const maxLng = Math.min(180, lng + lngDelta);
+
+  const where = {
+    latitude: { gte: minLat, lte: maxLat },
+    longitude: { gte: minLng, lte: maxLng },
+  };
+  if (district) where.district = district;
+
   const clinics = await prisma.clinic.findMany({
+    where,
     include: { reviews: { select: { rating: true } } },
   });
 
@@ -51,6 +69,7 @@ async function listNearby({ lat, lng, radiusKm }) {
         phone: c.phone,
         address: c.address,
         city: c.city,
+        district: c.district,
         latitude: c.latitude,
         longitude: c.longitude,
         distanceKm: Math.round(distance * 100) / 100,
@@ -91,8 +110,10 @@ async function getById(id) {
     phone: clinic.phone,
     address: clinic.address,
     city: clinic.city,
+    district: clinic.district,
     latitude: clinic.latitude,
     longitude: clinic.longitude,
+    updatedAt: clinic.updatedAt.toISOString(),
     openingHours: clinic.openingHours,
     todayHours,
     isOpenNow: status.open,
@@ -126,8 +147,26 @@ async function upsertReview({ clinicId, userId, rating, comment }) {
   return publicReview(review);
 }
 
+async function listDistricts() {
+  const grouped = await prisma.clinic.groupBy({
+    by: ['district'],
+    where: { district: { not: null } },
+    _count: { _all: true },
+  });
+  const countByKey = new Map(grouped.map((g) => [g.district, g._count._all]));
+
+  return TASHKENT_DISTRICTS.map((d) => ({
+    key: d.key,
+    name: d.name,
+    lat: d.lat,
+    lng: d.lng,
+    clinicCount: countByKey.get(d.key) || 0,
+  }));
+}
+
 module.exports = {
   listNearby,
   getById,
   upsertReview,
+  listDistricts,
 };

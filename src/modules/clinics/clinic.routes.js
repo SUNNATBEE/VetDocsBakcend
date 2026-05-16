@@ -2,6 +2,7 @@ const express = require('express');
 const { asyncHandler } = require('../../common/middleware/asyncHandler');
 const { requireAuth } = require('../../common/middleware/requireAuth');
 const { validate } = require('../../common/middleware/validate');
+const { geocodeNearbyLimiter } = require('../../common/middleware/rateLimiter');
 const clinicController = require('./clinic.controller');
 const {
   nearbyQuerySchema,
@@ -15,9 +16,11 @@ function createClinicRouter(env) {
 
   router.get(
     '/nearby',
+    geocodeNearbyLimiter(env),
     validate(nearbyQuerySchema, 'query'),
     asyncHandler(clinicController.nearby),
   );
+  router.get('/districts', asyncHandler(clinicController.districts));
   router.get(
     '/:id',
     validate(clinicIdParamsSchema, 'params'),

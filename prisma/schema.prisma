@@ -51,6 +51,7 @@ model Clinic {
   phone        String
   address      String
   city         String
+  district     String?
   latitude     Float
   longitude    Float
   /// JSON: { "mon": { "open":"09:00","close":"19:00" } | null, ... }
@@ -60,6 +61,7 @@ model Clinic {
   reviews      Review[]
 
   @@index([city])
+  @@index([district])
   @@index([latitude, longitude])
 }
 
